@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>盲人導讀師</title>
+</head>
+<body>
+<h1>LINE 訊息朗讀</h1>
+<button id="enable-btn">啟用朗讀</button>
+<div id="message"></div>
+
+<script>
+const SHEET_ID = "你的GoogleSheetID";
+
+// 啟用 TTS
+document.getElementById('enable-btn').addEventListener('click', () => {
+    speechSynthesis.speak(new SpeechSynthesisUtterance('朗讀已啟用'));
+});
+
+// 定時讀 Google Sheet 最新訊息
+let lastRow = 0;
+setInterval(async () => {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+    const res = await fetch(url);
+    const text = await res.text();
+    const json = JSON.parse(text.substr(47).slice(0,-2));
+    const rows = json.table.rows;
+    if(rows.length > 0 && rows.length !== lastRow){
+        lastRow = rows.length;
+        const msg = rows[rows.length-1].c[1].v; // message 欄位
+        document.getElementById('message').textContent = msg;
+        const utter = new SpeechSynthesisUtterance(msg);
+        utter.lang = 'zh-TW';
+        speechSynthesis.cancel();
+        speechSynthesis.speak(utter);
+    }
+}, 2000); // 每 2 秒檢查一次
+</script>
+</body>
+</html>
