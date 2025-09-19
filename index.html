@@ -1,140 +1,156 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>盲人導讀師 (LINE 連動版)</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-body {
-    background-color: #121212;
-    color: #ffffff;
-    font-family: 'Inter', sans-serif, 'Microsoft JhengHei', '微軟正黑體';
-}
-.btn {
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); }
-.btn:active { transform: translateY(0); box-shadow: none; }
-textarea:focus { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); border-color: #3B82F6; }
-.status-dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
-.status-disconnected { background-color: #ef4444; }
-.status-connected { background-color: #22c55e; animation: none; }
-@keyframes pulse {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
-</style>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>盲人導讀師 (LINE 連動版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif, 'Microsoft JhengHei', '微軟正黑體';
+        }
+        .btn {
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); }
+        .btn:active { transform: translateY(0); box-shadow: none; }
+        textarea:focus { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); border-color: #3B82F6; }
+        .status-dot {
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+        .status-disconnected { background-color: #ef4444; }
+        .status-connected { background-color: #22c55e; animation: none; }
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
-<main class="w-full max-w-2xl mx-auto p-6 md:p-8 bg-[#1e1e1e] rounded-2xl shadow-lg">
-<header class="text-center mb-6">
-    <h1 class="text-3xl md:text-4xl font-bold text-white">盲人導讀師</h1>
-    <div id="connection-status" class="flex items-center justify-center mt-3 text-lg text-gray-300">
-        <span id="status-dot" class="status-dot status-disconnected mr-2"></span>
-        <span id="status-text">正在連線至 LINE 訊息...</span>
-    </div>
-</header>
+    <main class="w-full max-w-2xl mx-auto p-6 md:p-8 bg-[#1e1e1e] rounded-2xl shadow-lg">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">盲人導讀師</h1>
+            <div id="connection-status" class="flex items-center justify-center mt-3 text-lg text-gray-300">
+                <span id="status-dot" class="status-dot status-disconnected mr-2"></span>
+                <span id="status-text">正在連線至 LINE Bot 服務...</span>
+            </div>
+        </header>
 
-<div class="mb-6">
-    <label for="text-to-read" class="sr-only">訊息內容</label>
-    <textarea id="text-to-read" rows="8"
-        class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 focus:outline-none focus:border-blue-500 resize-none"
-        placeholder="等待接收來自 LINE 的訊息..." readonly></textarea>
-</div>
+        <div class="mb-6">
+            <label for="text-to-read" class="sr-only">訊息內容</label>
+            <textarea
+                id="text-to-read"
+                rows="8"
+                class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 focus:outline-none focus:border-blue-500 resize-none"
+                placeholder="等待接收來自 LINE 的訊息..."
+                readonly
+            ></textarea>
+        </div>
 
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-    <button id="reread-btn" class="btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-lg">
-        重讀一次
-    </button>
-    <button id="stop-btn" class="btn w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg text-lg">
-        停止朗讀
-    </button>
-</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button id="reread-btn" class="btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-lg">
+                重讀一次
+            </button>
+            <button id="stop-btn" class="btn w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg text-lg">
+                停止朗讀
+            </button>
+        </div>
+        
+        <div id="status" class="text-center text-gray-400 mt-6 h-6"></div>
+    </main>
 
-<div id="status" class="text-center text-gray-400 mt-6 h-6"></div>
-</main>
+    <script>
+        const speak = (text, statusDiv, readBtn) => {
+            if (!('speechSynthesis' in window)) {
+                console.error('瀏覽器不支援語音合成。');
+                statusDiv.textContent = '瀏覽器不支援語音合成。';
+                return;
+            }
+            window.speechSynthesis.cancel();
+            if (text.trim() === '') {
+                statusDiv.textContent = '沒有內容可以朗讀。';
+                return;
+            }
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'zh-TW';
+            utterance.rate = 1;
+            utterance.pitch = 1;
+            utterance.onstart = () => { statusDiv.textContent = '正在朗讀中...'; if(readBtn) readBtn.disabled = true; };
+            utterance.onend = () => { statusDiv.textContent = ''; if(readBtn) readBtn.disabled = false; };
+            utterance.onerror = (event) => { console.error('語音合成發生錯誤:', event.error); statusDiv.textContent = '朗讀時發生錯誤。'; if(readBtn) readBtn.disabled = false; };
+            window.speechSynthesis.speak(utterance);
+        };
+    </script>
 
-<script>
-const SHEET_ID = "1KfSxDK8Crf20xrhX59vds_hot8lY6BnLIleYR5PqYN8"; // 改成你的 Sheet ID
-const SHEET_NAME = "LINE_messages";
-let lastMessage = "";
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const textArea = document.getElementById('text-to-read');
+            const rereadBtn = document.getElementById('reread-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const statusDiv = document.getElementById('status');
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
 
-function speak(text, statusDiv, readBtn){
-    if(!('speechSynthesis' in window)){
-        console.error('瀏覽器不支援語音合成。');
-        statusDiv.textContent = '瀏覽器不支援語音合成。';
-        return;
-    }
-    window.speechSynthesis.cancel();
-    if(text.trim()===""){ statusDiv.textContent='沒有內容可以朗讀。'; return; }
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang='zh-TW';
-    utterance.rate=1;
-    utterance.pitch=1;
-    utterance.onstart = ()=>{ statusDiv.textContent='正在朗讀中...'; if(readBtn) readBtn.disabled=true; };
-    utterance.onend = ()=>{ statusDiv.textContent=''; if(readBtn) readBtn.disabled=false; };
-    utterance.onerror=(e)=>{ console.error('語音合成錯誤:', e.error); statusDiv.textContent='朗讀時發生錯誤。'; if(readBtn) readBtn.disabled=false; };
-    window.speechSynthesis.speak(utterance);
-}
+            const GAS_URL = "https://script.google.com/macros/s/AKfycbxeMfXVE-EX-EYclDvIygXy55SGiQxxws4g6zbgLosUD5b9lcB2UUeNIMIwEniY8cQifQ/exec"; // ← 填入你部署的 Web App URL
 
-async function fetchLatestMessage(){
-    const statusDot = document.getElementById('status-dot');
-    const statusText = document.getElementById('status-text');
-    const textArea = document.getElementById('text-to-read');
-    const statusDiv = document.getElementById('status');
-    const rereadBtn = document.getElementById('reread-btn');
+            async function fetchLatestMessage() {
+                try {
+                    const res = await fetch(GAS_URL);
+                    const data = await res.json();
+                    
+                    if(data.error){
+                        statusText.textContent = "無法取得 LINE 訊息: " + data.error;
+                        statusDot.classList.remove('status-connected');
+                        statusDot.classList.add('status-disconnected');
+                        return;
+                    }
 
-    try{
-        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${SHEET_NAME}`;
-        const res = await fetch(url);
-        const text = await res.text();
-        const json = JSON.parse(text.substring(47,text.length-2));
-        const rows = json.table.rows;
-        if(rows.length===0) return;
+                    const message = data.text || "";
+                    const timestamp = data.timestamp || new Date().toLocaleString();
 
-        const latest = rows[rows.length-1].c[1]?.v || "";
-        const timestamp = rows[rows.length-1].c[0]?.v || "";
-        if(latest && latest!==lastMessage){
-            lastMessage = latest;
-            textArea.value = `[${timestamp}]\n\n${latest}`;
-            speak(latest, statusDiv, rereadBtn);
-            statusDot.classList.remove('status-disconnected');
-            statusDot.classList.add('status-connected');
-            statusText.textContent = '已連線至 LINE 訊息';
-        }
-    }catch(err){
-        console.error(err);
-        statusText.textContent='無法取得 LINE 訊息';
-        const statusDot = document.getElementById('status-dot');
-        statusDot.classList.remove('status-connected');
-        statusDot.classList.add('status-disconnected');
-    }
-}
+                    textArea.value = `[${timestamp}]\n\n${message}`;
+                    speak(message, statusDiv, rereadBtn);
 
-document.addEventListener('DOMContentLoaded', ()=>{
-    const rereadBtn = document.getElementById('reread-btn');
-    const stopBtn = document.getElementById('stop-btn');
-    const textArea = document.getElementById('text-to-read');
+                    statusDot.classList.remove('status-disconnected');
+                    statusDot.classList.add('status-connected');
+                    statusText.textContent = '已取得最新 LINE 訊息';
 
-    // 每 5 秒自動抓最新訊息
-    setInterval(fetchLatestMessage, 5000);
+                } catch(err){
+                    console.error(err);
+                    statusText.textContent = '取得訊息失敗';
+                    statusDot.classList.remove('status-connected');
+                    statusDot.classList.add('status-disconnected');
+                }
+            }
 
-    rereadBtn.addEventListener('click', ()=>{
-        const fullText = textArea.value;
-        const messageToRead = fullText.substring(fullText.indexOf('\n\n')+2);
-        speak(messageToRead, document.getElementById('status'), rereadBtn);
-    });
+            fetchLatestMessage();
+            setInterval(fetchLatestMessage, 5000);
 
-    stopBtn.addEventListener('click', ()=>{ window.speechSynthesis.cancel(); });
+            rereadBtn.addEventListener('click', () => {
+                const fullText = textArea.value;
+                const messageToRead = fullText.substring(fullText.indexOf('\n\n') + 2);
+                speak(messageToRead, statusDiv, rereadBtn);
+            });
 
-    window.addEventListener('beforeunload', ()=>{ window.speechSynthesis.cancel(); });
-});
-</script>
+            stopBtn.addEventListener('click', () => {
+                window.speechSynthesis.cancel();
+            });
+
+            window.addEventListener('beforeunload', () => {
+                window.speechSynthesis.cancel();
+            });
+        });
+    </script>
 </body>
 </html>
