@@ -1,0 +1,8 @@
+<button id="test">朗讀測試</button>
+<script>
+document.getElementById('test').addEventListener('click', () => {
+  const u = new SpeechSynthesisUtterance('這是一個測試');
+  u.lang = 'zh-TW';
+  window.speechSynthesis.speak(u);
+});
+</script>
