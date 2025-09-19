@@ -6,15 +6,15 @@
 <title>盲人導讀師 (LINE 連動版)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-body { background-color: #121212; color: #fff; font-family: 'Inter','Microsoft JhengHei','微軟正黑體'; }
+body { background-color: #121212; color: #fff; font-family:'Inter','微軟正黑體'; }
 .btn { transition: all 0.3s ease; display:flex; align-items:center; justify-content:center; }
-.btn:hover { transform: translateY(-2px); box-shadow:0 4px 8px rgba(0,0,0,0.2); }
-.btn:active { transform: translateY(0); box-shadow:none; }
+.btn:hover { transform: translateY(-2px); box-shadow:0 4px 8px rgba(0,0,0,0.2);}
+.btn:active { transform: translateY(0); box-shadow:none;}
 textarea:focus { box-shadow:0 0 0 3px rgba(59,130,246,0.5); border-color:#3B82F6; }
-.status-dot { height:12px; width:12px; border-radius:50%; display:inline-block; animation:pulse 2s infinite; }
-.status-disconnected { background-color:#ef4444; }
-.status-connected { background-color:#22c55e; animation:none; }
-@keyframes pulse { 0% { transform:scale(0.95); box-shadow:0 0 0 0 rgba(239,68,68,0.7); } 70% { transform:scale(1); box-shadow:0 0 0 10px rgba(239,68,68,0); } 100% { transform:scale(0.95); box-shadow:0 0 0 0 rgba(239,68,68,0); } }
+.status-dot {height:12px;width:12px;border-radius:50%;display:inline-block;animation:pulse 2s infinite;}
+.status-disconnected {background-color:#ef4444;}
+.status-connected {background-color:#22c55e;animation:none;}
+@keyframes pulse {0%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(239,68,68,0.7);}70%{transform:scale(1);box-shadow:0 0 0 10px rgba(239,68,68,0);}100%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(239,68,68,0);}}
 </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
@@ -26,62 +26,79 @@ textarea:focus { box-shadow:0 0 0 3px rgba(59,130,246,0.5); border-color:#3B82F6
 <span id="status-text">正在連線至 LINE Bot 服務...</span>
 </div>
 </header>
+
 <div class="mb-6">
-<textarea id="text-to-read" rows="8" class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 focus:outline-none focus:border-blue-500 resize-none" placeholder="等待接收來自 LINE 的訊息..." readonly></textarea>
+<textarea id="text-to-read" rows="8" class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 focus:outline-none resize-none" placeholder="等待接收來自 LINE 的訊息..." readonly></textarea>
 </div>
+
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 <button id="reread-btn" class="btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-lg">重讀一次</button>
 <button id="stop-btn" class="btn w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg text-lg">停止朗讀</button>
 </div>
+
 <div id="status" class="text-center text-gray-400 mt-6 h-6"></div>
 </main>
 
 <script>
-const GAS_URL = "
-https://script.google.com/macros/s/AKfycbxeMfXVE-EX-EYclDvIygXy55SGiQxxws4g6zbgLosUD5b9lcB2UUeNIMIwEniY8cQifQ/exec"; // ← 填入你的 Web App URL
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxeMfXVE-EX-EYclDvIygXy55SGiQxxws4g6zbgLosUD5b9lcB2UUeNIMIwEniY8cQifQ/exec'; // <-- 改成你的 Web App URL
 
-const speak = (text, statusDiv, readBtn) => {
-  if (!('speechSynthesis' in window)) { statusDiv.textContent='瀏覽器不支援語音合成'; return; }
-  window.speechSynthesis.cancel();
-  if(text.trim()===''){ statusDiv.textContent='沒有內容可以朗讀'; return; }
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang='zh-TW'; utter.rate=1; utter.pitch=1;
-  utter.onstart=()=>{ statusDiv.textContent='正在朗讀中...'; if(readBtn) readBtn.disabled=true; }
-  utter.onend=()=>{ statusDiv.textContent=''; if(readBtn) readBtn.disabled=false; }
-  utter.onerror=(e)=>{ console.error('語音合成錯誤:',e); statusDiv.textContent='朗讀時發生錯誤'; if(readBtn) readBtn.disabled=false; }
-  window.speechSynthesis.speak(utter);
+const speak = (text,statusDiv,readBtn)=>{
+    if(!('speechSynthesis' in window)){statusDiv.textContent='瀏覽器不支援語音合成';return;}
+    window.speechSynthesis.cancel();
+    if(text.trim()===''){statusDiv.textContent='沒有內容可以朗讀';return;}
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang='zh-TW';
+    utter.rate=1;
+    utter.pitch=1;
+    utter.onstart=()=>{statusDiv.textContent='正在朗讀中...'; if(readBtn) readBtn.disabled=true;}
+    utter.onend=()=>{statusDiv.textContent=''; if(readBtn) readBtn.disabled=false;}
+    utter.onerror=(e)=>{statusDiv.textContent='朗讀發生錯誤'; console.error(e); if(readBtn) readBtn.disabled=false;}
+    window.speechSynthesis.speak(utter);
 };
 
-async function fetchLatestMessage() {
-  const statusDiv = document.getElementById('status');
-  const textArea = document.getElementById('text-to-read');
-  try {
-    const res = await fetch(GAS_URL);
-    const data = await res.json();
-    if (data.error) { statusDiv.textContent="取得訊息失敗："+data.error; textArea.value=""; return; }
-    if (!data.text) { statusDiv.textContent="取得訊息失敗：尚無 LINE 訊息"; textArea.value=""; return; }
-    const timestamp = new Date(data.timestamp).toLocaleString();
-    textArea.value = `[${timestamp}]\n\n${data.text}`;
-    statusDiv.textContent="已取得最新訊息";
-    speak(data.text,statusDiv,document.getElementById('reread-btn'));
-  } catch(err){
-    console.error(err);
-    statusDiv.textContent="取得訊息失敗："+err.message;
-    textArea.value="";
-  }
+async function fetchMessage(){
+    const textArea = document.getElementById('text-to-read');
+    const statusDiv = document.getElementById('status');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+
+    try{
+        const res = await fetch(GAS_URL);
+        if(!res.ok){ throw new Error('HTTP '+res.status);}
+        const data = await res.json();
+        console.log('GAS回傳:',data);
+        if(!data || !data.text){
+            statusText.textContent='取得訊息失敗: 無訊息';
+            statusDot.classList.remove('status-connected');
+            statusDot.classList.add('status-disconnected');
+            textArea.value='等待第一則來自 LINE 的訊息...';
+        }else{
+            statusText.textContent='已連線至 LINE Bot 服務';
+            statusDot.classList.remove('status-disconnected');
+            statusDot.classList.add('status-connected');
+            const ts = data.timestamp || new Date().toLocaleString();
+            textArea.value=`[${ts}]\n\n${data.text}`;
+            speak(data.text,statusDiv,document.getElementById('reread-btn'));
+        }
+    }catch(err){
+        console.error('fetch 發生錯誤:',err);
+        statusText.textContent='連線失敗: '+err.message;
+        statusDot.classList.remove('status-connected');
+        statusDot.classList.add('status-disconnected');
+        textArea.value='取得訊息失敗';
+    }
 }
 
+// 每 5 秒檢查一次
+setInterval(fetchMessage,5000);
+fetchMessage();
+
 document.getElementById('reread-btn').addEventListener('click',()=>{
-  const fullText=document.getElementById('text-to-read').value;
-  const message=fullText.substring(fullText.indexOf('\n\n')+2);
-  speak(message,document.getElementById('status'),document.getElementById('reread-btn'));
+    const fullText = document.getElementById('text-to-read').value;
+    const msg = fullText.substring(fullText.indexOf('\n\n')+2);
+    speak(msg,document.getElementById('status'),document.getElementById('reread-btn'));
 });
-
-document.getElementById('stop-btn').addEventListener('click',()=>{
-  window.speechSynthesis.cancel();
-});
-
-setInterval(fetchLatestMessage,3000);
+document.getElementById('stop-btn').addEventListener('click',()=>{window.speechSynthesis.cancel();});
 </script>
 </body>
 </html>
