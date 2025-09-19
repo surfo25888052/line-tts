@@ -1,8 +1,51 @@
-<button id="test">朗讀測試</button>
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>手機 TTS 測試</title>
+<style>
+body { background:#121212; color:#fff; font-family:sans-serif; text-align:center; padding:20px;}
+button { margin:10px; padding:10px 20px; font-size:16px;}
+pre { text-align:left; background:#222; padding:10px; border-radius:6px; max-height:200px; overflow:auto;}
+</style>
+</head>
+<body>
+<h1>手機 TTS 測試</h1>
+<button id="enable-speech">啟用語音並測試</button>
+<pre id="voices-log"></pre>
+
 <script>
-document.getElementById('test').addEventListener('click', () => {
-  const u = new SpeechSynthesisUtterance('這是一個測試');
-  u.lang = 'zh-TW';
-  window.speechSynthesis.speak(u);
+let voices = [];
+
+function logVoices() {
+    voices = window.speechSynthesis.getVoices();
+    const log = voices.map(v => `${v.name} | ${v.lang}`).join('\n');
+    document.getElementById('voices-log').textContent = log;
+    console.log('可用 voices:', voices);
+}
+
+// 手機 Chrome 首次載入可能空陣列，監聽 voiceschanged
+window.speechSynthesis.onvoiceschanged = logVoices;
+
+document.getElementById('enable-speech').addEventListener('click', () => {
+    logVoices();
+
+    if(!voices.length) {
+        alert('voice 列表還沒準備好，稍等一下再點按鈕。');
+        return;
+    }
+
+    // 選一個中文 Google voice
+    const zhVoice = voices.find(v => v.lang.includes('zh') && v.name.includes('Google')) || voices[0];
+
+    const utter = new SpeechSynthesisUtterance('您好，這是文字轉語音測試。請確認手機是否有聲音。');
+    utter.lang = 'zh-TW';
+    utter.voice = zhVoice;
+    window.speechSynthesis.speak(utter);
+
+    alert(`已啟用語音，使用 voice: ${zhVoice.name} | ${zhVoice.lang}`);
 });
 </script>
+</body>
+</html>
