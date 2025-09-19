@@ -1,156 +1,83 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>盲人導讀師 (LINE 連動版)</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body {
-            background-color: #121212;
-            color: #ffffff;
-            font-family: 'Inter', sans-serif, 'Microsoft JhengHei', '微軟正黑體';
-        }
-        .btn {
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); }
-        .btn:active { transform: translateY(0); box-shadow: none; }
-        textarea:focus { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); border-color: #3B82F6; }
-        .status-dot {
-            height: 12px;
-            width: 12px;
-            border-radius: 50%;
-            display: inline-block;
-            animation: pulse 2s infinite;
-        }
-        .status-disconnected { background-color: #ef4444; }
-        .status-connected { background-color: #22c55e; animation: none; }
-        @keyframes pulse {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-        }
-    </style>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>盲人導讀師 (LINE 連動版)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+textarea { resize: none; }
+</style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
-    <main class="w-full max-w-2xl mx-auto p-6 md:p-8 bg-[#1e1e1e] rounded-2xl shadow-lg">
-        <header class="text-center mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-white">盲人導讀師</h1>
-            <div id="connection-status" class="flex items-center justify-center mt-3 text-lg text-gray-300">
-                <span id="status-dot" class="status-dot status-disconnected mr-2"></span>
-                <span id="status-text">正在連線至 LINE Bot 服務...</span>
-            </div>
-        </header>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
+<main class="w-full max-w-2xl bg-gray-800 rounded-2xl p-6 shadow-lg">
+  <h1 class="text-3xl font-bold text-center mb-4">盲人導讀師</h1>
+  
+  <div class="mb-4">
+    <textarea id="msgArea" rows="8" class="w-full p-4 bg-gray-700 rounded-lg text-lg" readonly placeholder="等待 LINE 訊息..."></textarea>
+  </div>
+  
+  <div class="flex gap-4 mb-4">
+    <button id="readBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold flex items-center justify-center">
+      重讀一次
+    </button>
+    <button id="stopBtn" class="flex-1 bg-red-600 hover:bg-red-700 py-3 rounded-lg font-bold flex items-center justify-center">
+      停止朗讀
+    </button>
+  </div>
 
-        <div class="mb-6">
-            <label for="text-to-read" class="sr-only">訊息內容</label>
-            <textarea
-                id="text-to-read"
-                rows="8"
-                class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 focus:outline-none focus:border-blue-500 resize-none"
-                placeholder="等待接收來自 LINE 的訊息..."
-                readonly
-            ></textarea>
-        </div>
+  <p id="status" class="text-center text-gray-300 h-6"></p>
+</main>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button id="reread-btn" class="btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-lg">
-                重讀一次
-            </button>
-            <button id="stop-btn" class="btn w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg text-lg">
-                停止朗讀
-            </button>
-        </div>
-        
-        <div id="status" class="text-center text-gray-400 mt-6 h-6"></div>
-    </main>
+<script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxeMfXVE-EX-EYclDvIygXy55SGiQxxws4g6zbgLosUD5b9lcB2UUeNIMIwEniY8cQifQ/exec"; // ← 改成你的 Web App URL
+const msgArea = document.getElementById("msgArea");
+const readBtn = document.getElementById("readBtn");
+const stopBtn = document.getElementById("stopBtn");
+const status = document.getElementById("status");
 
-    <script>
-        const speak = (text, statusDiv, readBtn) => {
-            if (!('speechSynthesis' in window)) {
-                console.error('瀏覽器不支援語音合成。');
-                statusDiv.textContent = '瀏覽器不支援語音合成。';
-                return;
-            }
-            window.speechSynthesis.cancel();
-            if (text.trim() === '') {
-                statusDiv.textContent = '沒有內容可以朗讀。';
-                return;
-            }
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'zh-TW';
-            utterance.rate = 1;
-            utterance.pitch = 1;
-            utterance.onstart = () => { statusDiv.textContent = '正在朗讀中...'; if(readBtn) readBtn.disabled = true; };
-            utterance.onend = () => { statusDiv.textContent = ''; if(readBtn) readBtn.disabled = false; };
-            utterance.onerror = (event) => { console.error('語音合成發生錯誤:', event.error); statusDiv.textContent = '朗讀時發生錯誤。'; if(readBtn) readBtn.disabled = false; };
-            window.speechSynthesis.speak(utterance);
-        };
-    </script>
+let latestText = "";
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const textArea = document.getElementById('text-to-read');
-            const rereadBtn = document.getElementById('reread-btn');
-            const stopBtn = document.getElementById('stop-btn');
-            const statusDiv = document.getElementById('status');
-            const statusDot = document.getElementById('status-dot');
-            const statusText = document.getElementById('status-text');
+// 朗讀函式
+function speak(text){
+  if(!('speechSynthesis' in window)){ status.textContent="瀏覽器不支援 TTS"; return; }
+  window.speechSynthesis.cancel();
+  if(text.trim()===""){ status.textContent="無內容可朗讀"; return; }
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang="zh-TW";
+  u.rate=1;
+  u.pitch=1;
+  u.onstart=()=>{ status.textContent="朗讀中..."; readBtn.disabled=true; };
+  u.onend=()=>{ status.textContent=""; readBtn.disabled=false; };
+  window.speechSynthesis.speak(u);
+}
 
-            const GAS_URL = "https://script.google.com/macros/s/AKfycbxeMfXVE-EX-EYclDvIygXy55SGiQxxws4g6zbgLosUD5b9lcB2UUeNIMIwEniY8cQifQ/exec"; // ← 填入你部署的 Web App URL
+// 停止朗讀
+stopBtn.onclick = ()=>window.speechSynthesis.cancel();
+readBtn.onclick = ()=>speak(latestText);
 
-            async function fetchLatestMessage() {
-                try {
-                    const res = await fetch(GAS_URL);
-                    const data = await res.json();
-                    
-                    if(data.error){
-                        statusText.textContent = "無法取得 LINE 訊息: " + data.error;
-                        statusDot.classList.remove('status-connected');
-                        statusDot.classList.add('status-disconnected');
-                        return;
-                    }
+// 定時抓最新訊息
+async function fetchMessage(){
+  try{
+    const res = await fetch(GAS_URL);
+    const data = await res.json();
+    if(data.error){ status.textContent=data.error; return; }
+    const text = `[${new Date(data.timestamp).toLocaleString()}]\n${data.text}`;
+    if(latestText !== data.text){ // 新訊息才更新
+      latestText = data.text;
+      msgArea.value = text;
+      speak(latestText);
+    }
+  }catch(err){
+    console.error(err);
+    status.textContent="取得訊息失敗";
+  }
+}
 
-                    const message = data.text || "";
-                    const timestamp = data.timestamp || new Date().toLocaleString();
+// 每 5 秒抓一次
+setInterval(fetchMessage,5000);
+fetchMessage();
+</script>
 
-                    textArea.value = `[${timestamp}]\n\n${message}`;
-                    speak(message, statusDiv, rereadBtn);
-
-                    statusDot.classList.remove('status-disconnected');
-                    statusDot.classList.add('status-connected');
-                    statusText.textContent = '已取得最新 LINE 訊息';
-
-                } catch(err){
-                    console.error(err);
-                    statusText.textContent = '取得訊息失敗';
-                    statusDot.classList.remove('status-connected');
-                    statusDot.classList.add('status-disconnected');
-                }
-            }
-
-            fetchLatestMessage();
-            setInterval(fetchLatestMessage, 5000);
-
-            rereadBtn.addEventListener('click', () => {
-                const fullText = textArea.value;
-                const messageToRead = fullText.substring(fullText.indexOf('\n\n') + 2);
-                speak(messageToRead, statusDiv, rereadBtn);
-            });
-
-            stopBtn.addEventListener('click', () => {
-                window.speechSynthesis.cancel();
-            });
-
-            window.addEventListener('beforeunload', () => {
-                window.speechSynthesis.cancel();
-            });
-        });
-    </script>
 </body>
 </html>
