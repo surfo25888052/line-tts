@@ -6,7 +6,7 @@
 <title>盲人導讀師 (LINE 連動版)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-body { background-color: #121212; color: #ffffff; font-family: 'Inter', sans-serif, 'Microsoft JhengHei', '微軟正黑體'; }
+body { background-color: #121212; color: #fff; font-family: 'Inter','微軟正黑體'; }
 .btn { transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; }
 .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
 .btn:active { transform: translateY(0); box-shadow: none; }
@@ -14,11 +14,7 @@ textarea:focus { box-shadow: 0 0 0 3px rgba(59,130,246,0.5); border-color: #3B82
 .status-dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; }
 .status-connected { background-color: #22c55e; }
 .status-disconnected { background-color: #ef4444; animation: pulse 2s infinite; }
-@keyframes pulse {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239,68,68,0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239,68,68,0); }
-}
+@keyframes pulse {0%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(239,68,68,0.7);}70%{transform:scale(1);box-shadow:0 0 0 10px rgba(239,68,68,0);}100%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(239,68,68,0);}}
 </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
@@ -27,7 +23,7 @@ textarea:focus { box-shadow: 0 0 0 3px rgba(59,130,246,0.5); border-color: #3B82
 <h1 class="text-3xl md:text-4xl font-bold text-white">盲人導讀師</h1>
 <div class="flex items-center justify-center mt-2 text-lg">
     <span id="status-dot" class="status-dot status-disconnected"></span>
-    <span id="status-text" class="text-gray-300">請先點擊下方按鈕啟用語音</span>
+    <span id="status-text" class="text-gray-300">請點擊「啟用語音」開始朗讀</span>
 </div>
 <div class="mt-1 text-gray-400 text-sm" id="last-time">最後訊息時間：-</div>
 </header>
@@ -50,6 +46,7 @@ let lastId = null;
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
 const lastTime = document.getElementById('last-time');
+const textArea = document.getElementById('text-to-read');
 
 const speak = (text) => {
     if(!speechEnabled) return;
@@ -57,31 +54,32 @@ const speak = (text) => {
     if(text.trim() === '') return;
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'zh-TW';
+    utter.rate = 1;
+    utter.pitch = 1;
     window.speechSynthesis.speak(utter);
 };
 
+// 點擊一次啟用語音，之後自動朗讀新訊息
 document.getElementById('enable-speech').addEventListener('click', () => {
-    // 觸發一次空白朗讀以解鎖手機瀏覽器語音
     const u = new SpeechSynthesisUtterance('語音已啟用');
     u.lang = 'zh-TW';
-    u.onend = () => {
-        speechEnabled = true;
-        document.getElementById('enable-speech').style.display = 'none';
-        statusText.textContent = '已啟用語音，將自動朗讀新訊息';
-    };
     window.speechSynthesis.speak(u);
+    speechEnabled = true;
+    document.getElementById('enable-speech').style.display = 'none';
+    statusText.textContent = '已啟用語音，將自動朗讀新訊息';
 });
 
+// 重讀按鈕
 document.getElementById('reread-btn').addEventListener('click', () => {
-    const message = document.getElementById('text-to-read').value;
-    speak(message);
+    speak(textArea.value);
 });
 
+// 停止朗讀
 document.getElementById('stop-btn').addEventListener('click', () => {
     window.speechSynthesis.cancel();
 });
 
-// 輪詢最新 LINE 訊息，每 3 秒
+// 輪詢最新 LINE 訊息
 setInterval(async () => {
     if(!speechEnabled) return;
     try {
@@ -101,10 +99,9 @@ setInterval(async () => {
 
         if(data.timestamp !== lastId){
             lastId = data.timestamp;
-            document.getElementById('text-to-read').value = data.text;
+            textArea.value = data.text;
             speak(data.text);
 
-            // 顯示最後訊息時間
             const t = new Date(data.timestamp);
             lastTime.textContent = '最後訊息時間：' + t.toLocaleString();
         }
