@@ -6,113 +6,116 @@
 <title>盲人導讀師 (LINE 連動版)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-body { background-color: #121212; color: #ffffff; font-family: 'Inter', sans-serif, 'Microsoft JhengHei', '微軟正黑體'; }
-.btn { transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; }
-.btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-.btn:active { transform: translateY(0); box-shadow: none; }
-textarea:focus { box-shadow: 0 0 0 3px rgba(59,130,246,0.5); border-color: #3B82F6; }
-.status-dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-.status-connected { background-color: #22c55e; }
-.status-disconnected { background-color: #ef4444; animation: pulse 2s infinite; }
+body {background-color: #121212; color: #fff; font-family: 'Inter','微軟正黑體';}
+.btn {transition: all 0.3s ease; display: flex; align-items: center; justify-content: center;}
+.btn:hover {transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2);}
+.btn:active {transform: translateY(0); box-shadow: none;}
+textarea:focus {box-shadow: 0 0 0 3px rgba(59,130,246,0.5); border-color:#3B82F6;}
+.status-dot {height:12px; width:12px; border-radius:50%; display:inline-block; animation:pulse 2s infinite;}
+.status-disconnected {background-color:#ef4444;}
+.status-connected {background-color:#22c55e; animation:none;}
 @keyframes pulse {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239,68,68,0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+0% {transform: scale(0.95); box-shadow:0 0 0 0 rgba(239,68,68,0.7);}
+70% {transform: scale(1); box-shadow:0 0 0 10px rgba(239,68,68,0);}
+100% {transform: scale(0.95); box-shadow:0 0 0 0 rgba(239,68,68,0);}
 }
 </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
 <main class="w-full max-w-2xl mx-auto p-6 md:p-8 bg-[#1e1e1e] rounded-2xl shadow-lg">
 <header class="text-center mb-6">
-<h1 class="text-3xl md:text-4xl font-bold text-white">盲人導讀師</h1>
-<div class="flex items-center justify-center mt-2 text-lg">
-    <span id="status-dot" class="status-dot status-disconnected"></span>
-    <span id="status-text" class="text-gray-300">請先點擊下方按鈕啟用語音</span>
+<h1 class="text-3xl md:text-4xl font-bold">盲人導讀師</h1>
+<div class="flex items-center justify-center mt-3 text-lg text-gray-300">
+<span id="status-dot" class="status-dot status-disconnected mr-2"></span>
+<span id="status-text">正在連線至 LINE Bot 服務...</span>
 </div>
-<div class="mt-1 text-gray-400 text-sm" id="last-time">最後訊息時間：-</div>
 </header>
 
 <div class="mb-6">
-<textarea id="text-to-read" rows="8" class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 resize-none" placeholder="等待接收來自 LINE 的訊息..." readonly></textarea>
+<textarea id="text-to-read" rows="8" class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 focus:outline-none resize-none" placeholder="等待接收來自 LINE 的訊息..." readonly></textarea>
 </div>
 
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-<button id="enable-speech" class="btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-lg">啟用語音</button>
+<button id="enable-speech-btn" class="btn w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-4 rounded-lg text-lg">啟用語音</button>
 <button id="reread-btn" class="btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-lg">重讀一次</button>
 <button id="stop-btn" class="btn w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg text-lg">停止朗讀</button>
 </div>
+
+<div id="status" class="text-center text-gray-400 mt-6 h-6"></div>
 </main>
 
 <script>
 let speechEnabled = false;
-let lastId = null;
+let lastMessageText = "";
 
-const statusDot = document.getElementById('status-dot');
-const statusText = document.getElementById('status-text');
-const lastTime = document.getElementById('last-time');
-
-const speak = (text) => {
-    if(!speechEnabled) return;
+const speak = (text, statusDiv, readBtn) => {
+    if (!speechEnabled) return;
+    if (!('speechSynthesis' in window)) {
+        console.error('瀏覽器不支援語音合成。');
+        statusDiv.textContent = '瀏覽器不支援語音合成。';
+        return;
+    }
     window.speechSynthesis.cancel();
-    if(text.trim() === '') return;
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = 'zh-TW';
-    window.speechSynthesis.speak(utter);
+    if (text.trim() === '') return;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'zh-TW';
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.onstart = () => { statusDiv.textContent = '正在朗讀中...'; if(readBtn) readBtn.disabled = true; };
+    utterance.onend = () => { statusDiv.textContent = ''; if(readBtn) readBtn.disabled = false; };
+    utterance.onerror = (event) => { console.error('語音合成錯誤:', event.error); statusDiv.textContent='朗讀錯誤'; if(readBtn) readBtn.disabled=false; };
+    window.speechSynthesis.speak(utterance);
 };
 
-document.getElementById('enable-speech').addEventListener('click', () => {
-    const u = new SpeechSynthesisUtterance('');
-    u.lang = 'zh-TW';
-    window.speechSynthesis.speak(u);
-
+document.getElementById('enable-speech-btn').addEventListener('click', () => {
     speechEnabled = true;
-    document.getElementById('enable-speech').style.display = 'none';
-    statusText.textContent = '已啟用語音，將自動朗讀新訊息';
+    // 播放一個空白音觸發授權
+    const utterance = new SpeechSynthesisUtterance('');
+    window.speechSynthesis.speak(utterance);
+    document.getElementById('status-text').textContent = '語音已啟用';
 });
 
 document.getElementById('reread-btn').addEventListener('click', () => {
-    const message = document.getElementById('text-to-read').value;
-    speak(message);
+    const textArea = document.getElementById('text-to-read');
+    const message = textArea.value.split('\n\n')[1] || '';
+    speak(message, document.getElementById('status'), document.getElementById('reread-btn'));
 });
 
-document.getElementById('stop-btn').addEventListener('click', () => {
-    window.speechSynthesis.cancel();
-});
+document.getElementById('stop-btn').addEventListener('click', () => { window.speechSynthesis.cancel(); });
 
-// 輪詢最新 LINE 訊息
-setInterval(async () => {
-    if(!speechEnabled) return;
+// 每 3 秒拉一次最新 LINE 訊息
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbxeMfXVE-EX-EYclDvIygXy55SGiQxxws4g6zbgLosUD5b9lcB2UUeNIMIwEniY8cQifQ/exec";
+const textArea = document.getElementById('text-to-read');
+const statusDiv = document.getElementById('status');
+const statusDot = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+
+async function fetchLatestMessage() {
     try {
-        const res = await fetch('https://script.google.com/macros/s/AKfycbxeMfXVE-EX-EYclDvIygXy55SGiQxxws4g6zbgLosUD5b9lcB2UUeNIMIwEniY8cQifQ/exec');
+        const res = await fetch(SHEET_URL);
         const data = await res.json();
-        if(data.error) {
-            console.error(data.error);
-            statusDot.classList.remove('status-connected');
-            statusDot.classList.add('status-disconnected');
-            statusText.textContent = '無法取得 LINE 訊息';
-            return;
+        if(data.error) { console.error(data.error); statusText.textContent="取得訊息失敗"; statusDot.className="status-dot status-disconnected"; return; }
+        const message = data.text;
+        const timestamp = data.timestamp;
+        textArea.value = `[${timestamp}]\n\n${message}`;
+        statusDot.className="status-dot status-connected";
+        statusText.textContent="已連線至 LINE Bot 服務";
+
+        // 只朗讀新的訊息
+        if (speechEnabled && message && message !== lastMessageText) {
+            lastMessageText = message;
+            speak(message, statusDiv, document.getElementById('reread-btn'));
         }
-
-        statusDot.classList.remove('status-disconnected');
-        statusDot.classList.add('status-connected');
-        statusText.textContent = '已連線至 LINE Bot 服務';
-
-        if(data.timestamp !== lastId){
-            lastId = data.timestamp;
-            document.getElementById('text-to-read').value = data.text;
-            speak(data.text);
-
-            // 顯示最後訊息時間
-            const t = new Date(data.timestamp);
-            lastTime.textContent = '最後訊息時間：' + t.toLocaleString();
-        }
-    } catch(e){
-        console.error('讀取訊息失敗:', e);
-        statusDot.classList.remove('status-connected');
-        statusDot.classList.add('status-disconnected');
-        statusText.textContent = '服務連線失敗';
+    } catch(err) {
+        console.error(err);
+        statusText.textContent="取得訊息失敗";
+        statusDot.className="status-dot status-disconnected";
     }
-}, 3000);
+}
+
+// 3 秒輪詢
+setInterval(fetchLatestMessage, 3000);
 </script>
 </body>
 </html>
