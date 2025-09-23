@@ -35,6 +35,19 @@ textarea:focus{box-shadow:0 0 0 3px rgba(59,130,246,0.5); border-color:#3B82F6;}
 <textarea id="text-to-read" rows="8" class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 resize-none" placeholder="等待接收來自 LINE 的訊息..." readonly></textarea>
 </div>
 
+<!-- ✅ 語音選擇 -->
+<div class="mb-6">
+  <label for="voice" class="text-gray-300 block mb-2">語音選擇：</label>
+  <select id="voice" class="w-full p-2 bg-[#2d2d2d] border border-gray-600 rounded-lg text-white"></select>
+</div>
+
+<!-- ✅ 語速控制 -->
+<div class="mb-6 flex items-center gap-4">
+  <label for="rate" class="text-gray-300">語速：</label>
+  <input type="range" id="rate" min="0.5" max="2" step="0.1" value="0.8" class="w-full">
+  <span id="rate-value" class="text-gray-300">0.8x</span>
+</div>
+
 <div id="buttons" class="flex justify-center gap-4">
 <button id="enable-speech" class="btn w-40 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-lg">啟用語音</button>
 <button id="reread-btn" class="btn w-40 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-lg">重讀一次</button>
@@ -45,18 +58,52 @@ textarea:focus{box-shadow:0 0 0 3px rgba(59,130,246,0.5); border-color:#3B82F6;}
 <script>
 let speechEnabled = false;
 let lastMessage = null;
+let speechRate = 0.8; // ✅ 預設語速
+let voices = [];
+let selectedVoice = null;
 
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
 const lastTime = document.getElementById('last-time');
 const textArea = document.getElementById('text-to-read');
 const enableBtn = document.getElementById('enable-speech');
+const rateSlider = document.getElementById('rate');
+const rateValue = document.getElementById('rate-value');
+const voiceSelect = document.getElementById('voice');
+
+// ✅ 語速控制
+rateSlider.addEventListener('input', ()=>{
+  speechRate = parseFloat(rateSlider.value);
+  rateValue.textContent = speechRate.toFixed(1) + "x";
+});
+
+// ✅ 載入可用的語音
+function loadVoices() {
+  voices = speechSynthesis.getVoices();
+  voiceSelect.innerHTML = "";
+  voices.forEach((v, i) => {
+    const option = document.createElement("option");
+    option.value = i;
+    option.textContent = `${v.name} (${v.lang})`;
+    if(v.lang === "zh-TW") option.selected = true; // 預設挑 zh-TW
+    voiceSelect.appendChild(option);
+  });
+  selectedVoice = voices.find(v => v.lang === "zh-TW") || voices[0];
+}
+speechSynthesis.onvoiceschanged = loadVoices;
+
+// ✅ 語音選擇
+voiceSelect.addEventListener("change", () => {
+  selectedVoice = voices[voiceSelect.value];
+});
 
 const speak = (text) => {
     if(!speechEnabled || !text) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'zh-TW';
+    u.lang = selectedVoice?.lang || "zh-TW";
+    u.voice = selectedVoice || null;
+    u.rate = speechRate; // ✅ 使用動態語速
     window.speechSynthesis.speak(u);
 };
 
