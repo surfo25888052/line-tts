@@ -48,6 +48,12 @@ textarea:focus{box-shadow:0 0 0 3px rgba(59,130,246,0.5); border-color:#3B82F6;}
   <span id="rate-value" class="text-gray-300">0.8x</span>
 </div>
 
+<!-- ✅ 自動啟用語音選項 -->
+<div class="mb-6 flex items-center gap-2">
+  <input type="checkbox" id="auto-enable" class="w-5 h-5">
+  <label for="auto-enable" class="text-gray-300">自動啟用語音</label>
+</div>
+
 <div id="buttons" class="flex justify-center gap-4">
 <button id="enable-speech" class="btn w-40 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-lg">啟用語音</button>
 <button id="reread-btn" class="btn w-40 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-lg">重讀一次</button>
@@ -70,32 +76,92 @@ const enableBtn = document.getElementById('enable-speech');
 const rateSlider = document.getElementById('rate');
 const rateValue = document.getElementById('rate-value');
 const voiceSelect = document.getElementById('voice');
+const autoEnable = document.getElementById('auto-enable');
 
 // ✅ 語速控制
 rateSlider.addEventListener('input', ()=>{
   speechRate = parseFloat(rateSlider.value);
   rateValue.textContent = speechRate.toFixed(1) + "x";
+  localStorage.setItem("speechRate", speechRate);
 });
 
 // ✅ 載入可用的語音
 function loadVoices() {
   voices = speechSynthesis.getVoices();
   voiceSelect.innerHTML = "";
+
   voices.forEach((v, i) => {
     const option = document.createElement("option");
     option.value = i;
     option.textContent = `${v.name} (${v.lang})`;
-    if(v.lang === "zh-TW") option.selected = true; // 預設挑 zh-TW
     voiceSelect.appendChild(option);
   });
-  selectedVoice = voices.find(v => v.lang === "zh-TW") || voices[0];
+
+  // ✅ 如果之前有儲存過語音
+  const savedVoice = localStorage.getItem("selectedVoiceName");
+  if (savedVoice) {
+    const idx = voices.findIndex(v => v.name === savedVoice);
+    if (idx !== -1) {
+      voiceSelect.value = idx;
+      selectedVoice = voices[idx];
+    }
+  } else {
+    // 沒有存過就預設 zh-TW
+    const twIndex = voices.findIndex(v => v.lang === "zh-TW");
+    if (twIndex !== -1) {
+      voiceSelect.value = twIndex;
+      selectedVoice = voices[twIndex];
+    } else {
+      voiceSelect.value = 0;
+      selectedVoice = voices[0];
+    }
+  }
+
+  // ✅ 載入語速
+  const savedRate = localStorage.getItem("speechRate");
+  if (savedRate) {
+    speechRate = parseFloat(savedRate);
+    rateSlider.value = speechRate;
+    rateValue.textContent = speechRate.toFixed(1) + "x";
+  }
 }
 speechSynthesis.onvoiceschanged = loadVoices;
 
 // ✅ 語音選擇
 voiceSelect.addEventListener("change", () => {
   selectedVoice = voices[voiceSelect.value];
+  if (selectedVoice) {
+    localStorage.setItem("selectedVoiceName", selectedVoice.name);
+  }
 });
+
+// ✅ 自動啟用語音 checkbox
+autoEnable.addEventListener("change", () => {
+  localStorage.setItem("autoEnableSpeech", autoEnable.checked ? "1" : "0");
+});
+
+// ✅ 檢查是否需要自動啟用
+function autoStartIfEnabled() {
+  const auto = localStorage.getItem("autoEnableSpeech");
+  if (auto === "1") {
+    autoEnable.checked = true;
+    enableSpeech();
+  }
+}
+
+// ✅ 語音啟用函式（共用）
+function enableSpeech() {
+  if (speechEnabled) return;
+  const u = new SpeechSynthesisUtterance('');
+  u.lang = 'zh-TW';
+  window.speechSynthesis.speak(u);
+  speechEnabled = true;
+  enableBtn.style.display = 'none';
+  statusText.textContent = '已啟用語音，自動朗讀新訊息';
+}
+
+// 點擊啟用語音
+enableBtn.addEventListener('click', enableSpeech);
 
 const speak = (text) => {
     if(!speechEnabled || !text) return;
@@ -103,19 +169,9 @@ const speak = (text) => {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = selectedVoice?.lang || "zh-TW";
     u.voice = selectedVoice || null;
-    u.rate = speechRate; // ✅ 使用動態語速
+    u.rate = speechRate;
     window.speechSynthesis.speak(u);
 };
-
-// 點擊啟用語音，按鈕消失
-enableBtn.addEventListener('click', ()=>{
-    const u = new SpeechSynthesisUtterance('');
-    u.lang = 'zh-TW';
-    window.speechSynthesis.speak(u);
-    speechEnabled = true;
-    enableBtn.style.display = 'none';
-    statusText.textContent = '已啟用語音，自動朗讀新訊息';
-});
 
 // 重讀 / 停止
 document.getElementById('reread-btn').addEventListener('click', () => { speak(textArea.value); });
@@ -150,6 +206,9 @@ setInterval(async ()=>{
         statusText.textContent="服務連線失敗";
     }
 },3000);
+
+// ✅ 頁面載入時檢查
+autoStartIfEnabled();
 </script>
 </body>
 </html>
