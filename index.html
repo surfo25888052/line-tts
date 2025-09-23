@@ -1,213 +1,275 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>盲人導讀師 (LINE 連動版)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-body { background-color: #121212; color: #fff; font-family:'Inter','微軟正黑體'; }
-.btn { display:flex; justify-content:center; align-items:center; transition:0.3s; }
-.btn:hover { transform: translateY(-2px); box-shadow:0 4px 8px rgba(0,0,0,0.2);}
-textarea:focus{box-shadow:0 0 0 3px rgba(59,130,246,0.5); border-color:#3B82F6;}
-.status-dot{width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:6px;}
-.status-connected{background-color:#22c55e;}
-.status-disconnected{background-color:#ef4444; animation:pulse 2s infinite;}
-@keyframes pulse{
-0%{transform:scale(0.95); box-shadow:0 0 0 0 rgba(239,68,68,0.7);}
-70%{transform:scale(1); box-shadow:0 0 0 10px rgba(239,68,68,0);}
-100%{transform:scale(0.95); box-shadow:0 0 0 0 rgba(239,68,68,0);}
-}
+body { background:#121212; color:#fff; font-family:'Inter','微軟正黑體'; }
+.btn{display:flex;justify-content:center;align-items:center;transition:0.3s;}
+.btn:hover{transform:translateY(-2px);box-shadow:0 4px 8px rgba(0,0,0,0.2);}
+textarea:focus{box-shadow:0 0 0 3px rgba(59,130,246,0.5);border-color:#3B82F6;}
+.status-dot{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:6px;}
+.status-connected{background:#22c55e;}
+.status-disconnected{background:#ef4444;animation:pulse 2s infinite;}
+@keyframes pulse{0%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(239,68,68,0.7);}70%{transform:scale(1);box-shadow:0 0 0 10px rgba(239,68,68,0);}100%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(239,68,68,0);} }
+.toast { position: fixed; right: 16px; bottom: 16px; background: #111827; color: #e5e7eb; padding: 10px 14px; border-radius:8px; box-shadow: 0 6px 18px rgba(0,0,0,0.4); font-size: 14px;}
+textarea::-webkit-scrollbar { width: 8px; }
+textarea::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+textarea::-webkit-scrollbar-track { background: #2d2d2d; border-radius: 4px; }
 </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
 <main class="w-full max-w-2xl p-6 bg-[#1e1e1e] rounded-2xl shadow-lg">
-<header class="text-center mb-6">
-<h1 class="text-3xl md:text-4xl font-bold">盲人導讀師</h1>
-<div class="flex items-center justify-center mt-2 text-lg">
-    <span id="status-dot" class="status-dot status-disconnected"></span>
-    <span id="status-text" class="text-gray-300">請點擊啟用語音</span>
-</div>
-<div class="mt-1 text-gray-400 text-sm" id="last-time">最後訊息時間：-</div>
-</header>
+  <header class="text-center mb-6">
+    <h1 class="text-3xl md:text-4xl font-bold">盲人導讀師</h1>
+    <div class="flex items-center justify-center mt-2 text-lg">
+      <span id="status-dot" class="status-dot status-disconnected"></span>
+      <span id="status-text" class="text-gray-300">請點擊啟用語音</span>
+    </div>
+    <div class="mt-1 text-gray-400 text-sm" id="last-time">最後訊息時間：-</div>
+  </header>
 
-<div class="mb-6">
-<textarea id="text-to-read" rows="8" class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 resize-none" placeholder="等待接收來自 LINE 的訊息..." readonly></textarea>
-</div>
+  <!-- 主訊息區（含歷史訊息） -->
+  <div class="mb-6">
+    <textarea id="text-to-read" rows="12" class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 resize-none" placeholder="等待接收來自 LINE 的訊息..." readonly></textarea>
+    <div class="mt-1 text-gray-300 text-sm" id="queue-count">待朗讀訊息：0</div>
+  </div>
 
-<!-- ✅ 語音選擇 -->
-<div class="mb-6">
-  <label for="voice" class="text-gray-300 block mb-2">語音選擇：</label>
-  <select id="voice" class="w-full p-2 bg-[#2d2d2d] border border-gray-600 rounded-lg text-white"></select>
-</div>
+  <div class="mb-6">
+    <label for="voice" class="text-gray-300 block mb-2">語音選擇：</label>
+    <select id="voice" class="w-full p-2 bg-[#2d2d2d] border border-gray-600 rounded-lg text-white"></select>
+  </div>
 
-<!-- ✅ 語速控制 -->
-<div class="mb-6 flex items-center gap-4">
-  <label for="rate" class="text-gray-300">語速：</label>
-  <input type="range" id="rate" min="0.5" max="2" step="0.1" value="0.8" class="w-full">
-  <span id="rate-value" class="text-gray-300">0.8x</span>
-</div>
+  <div class="mb-6 flex items-center gap-4">
+    <label for="rate" class="text-gray-300">語速：</label>
+    <input type="range" id="rate" min="0.5" max="2" step="0.1" value="0.8" class="w-full">
+    <span id="rate-value" class="text-gray-300">0.8x</span>
+  </div>
 
-<!-- ✅ 自動啟用語音選項 -->
-<div class="mb-6 flex items-center gap-2">
-  <input type="checkbox" id="auto-enable" class="w-5 h-5">
-  <label for="auto-enable" class="text-gray-300">自動啟用語音</label>
-</div>
+  <div class="mb-6 flex items-center gap-2">
+    <input type="checkbox" id="auto-enable" class="w-5 h-5">
+    <label for="auto-enable" class="text-gray-300">自動啟用語音</label>
+  </div>
 
-<div id="buttons" class="flex justify-center gap-4">
-<button id="enable-speech" class="btn w-40 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-lg">啟用語音</button>
-<button id="reread-btn" class="btn w-40 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-lg">重讀一次</button>
-<button id="stop-btn" class="btn w-40 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg text-lg">停止朗讀</button>
-</div>
+  <div id="buttons" class="flex justify-center gap-4">
+    <button id="enable-speech" class="btn w-40 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-lg">啟用語音</button>
+    <button id="reread-btn" class="btn w-40 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-lg">重讀一次</button>
+    <button id="stop-btn" class="btn w-40 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg text-lg">停止朗讀</button>
+  </div>
 </main>
 
+<div id="toast" class="toast" style="display:none;"></div>
+
 <script>
-let speechEnabled = false;
-let lastMessage = null;
-let speechRate = 0.8; // ✅ 預設語速
-let voices = [];
-let selectedVoice = null;
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxeMfXVE-EX-EYclDvIygXy55SGiQxxws4g6zbgLosUD5b9lcB2UUeNIMIwEniY8cQifQ/exec';
 
-const statusDot = document.getElementById('status-dot');
-const statusText = document.getElementById('status-text');
-const lastTime = document.getElementById('last-time');
-const textArea = document.getElementById('text-to-read');
-const enableBtn = document.getElementById('enable-speech');
-const rateSlider = document.getElementById('rate');
-const rateValue = document.getElementById('rate-value');
-const voiceSelect = document.getElementById('voice');
-const autoEnable = document.getElementById('auto-enable');
+let speechEnabled=false, speechRate=0.8, voices=[], selectedVoice=null;
+let messageQueue=[], reading=false;
+const processedMessageIds=new Set(), queuedIds=new Set();
 
-// ✅ 語速控制
-rateSlider.addEventListener('input', ()=>{
-  speechRate = parseFloat(rateSlider.value);
-  rateValue.textContent = speechRate.toFixed(1) + "x";
-  localStorage.setItem("speechRate", speechRate);
-});
+const statusDot=document.getElementById('status-dot');
+const statusText=document.getElementById('status-text');
+const lastTime=document.getElementById('last-time');
+const textArea=document.getElementById('text-to-read');
+const enableBtn=document.getElementById('enable-speech');
+const rateSlider=document.getElementById('rate');
+const rateValue=document.getElementById('rate-value');
+const voiceSelect=document.getElementById('voice');
+const autoEnable=document.getElementById('auto-enable');
+const toast=document.getElementById('toast');
+const queueCountEl=document.getElementById('queue-count');
 
-// ✅ 載入可用的語音
-function loadVoices() {
-  voices = speechSynthesis.getVoices();
-  voiceSelect.innerHTML = "";
+function showToast(msg, timeout=2500){
+  toast.textContent=msg; toast.style.display='block';
+  clearTimeout(toast._t);
+  toast._t=setTimeout(()=>{ toast.style.display='none'; }, timeout);
+}
 
-  voices.forEach((v, i) => {
-    const option = document.createElement("option");
-    option.value = i;
-    option.textContent = `${v.name} (${v.lang})`;
-    voiceSelect.appendChild(option);
+function updateQueueCount(){
+  queueCountEl.textContent = '待朗讀訊息：' + messageQueue.length;
+}
+
+// 將歷史訊息倒序顯示（最新在上方）並自動滾動到最上方
+function renderHistory(items){
+  const reversed = [...items].reverse();
+  textArea.value = reversed.map(msg=>{
+    const status = msg.status==='READ'?'✅':'●';
+    const time = new Date(msg.timestamp).toLocaleTimeString();
+    return `[${time}] ${msg.text} ${status}`;
+  }).join('\n');
+
+  // 自動滾動到最上方
+  textArea.scrollTop = 0;
+}
+
+/* ===== TTS 與語音設定 ===== */
+function loadVoices(){
+  voices=speechSynthesis.getVoices()||[];
+  voiceSelect.innerHTML='';
+  voices.forEach((v,i)=>{
+    const opt=document.createElement('option'); 
+    opt.value=i; 
+    opt.textContent=`${v.name} (${v.lang})`; 
+    voiceSelect.appendChild(opt);
   });
-
-  // ✅ 如果之前有儲存過語音
-  const savedVoice = localStorage.getItem("selectedVoiceName");
-  if (savedVoice) {
-    const idx = voices.findIndex(v => v.name === savedVoice);
-    if (idx !== -1) {
-      voiceSelect.value = idx;
-      selectedVoice = voices[idx];
-    }
-  } else {
-    // 沒有存過就預設 zh-TW
-    const twIndex = voices.findIndex(v => v.lang === "zh-TW");
-    if (twIndex !== -1) {
-      voiceSelect.value = twIndex;
-      selectedVoice = voices[twIndex];
-    } else {
-      voiceSelect.value = 0;
-      selectedVoice = voices[0];
-    }
+  const savedVoice=localStorage.getItem('selectedVoiceName');
+  if(savedVoice){ 
+    const idx=voices.findIndex(v=>v.name===savedVoice); 
+    if(idx!==-1){ voiceSelect.value=idx; selectedVoice=voices[idx]; } 
   }
-
-  // ✅ 載入語速
-  const savedRate = localStorage.getItem("speechRate");
-  if (savedRate) {
-    speechRate = parseFloat(savedRate);
-    rateSlider.value = speechRate;
-    rateValue.textContent = speechRate.toFixed(1) + "x";
+  else { 
+    const tw=voices.findIndex(v=>v.lang==='zh-TW'); 
+    selectedVoice=tw!==-1?voices[tw]:voices[0]; 
+    voiceSelect.value=voices.indexOf(selectedVoice); 
+  }
+  const savedRate=localStorage.getItem('speechRate'); 
+  if(savedRate){ 
+    speechRate=parseFloat(savedRate); 
+    rateSlider.value=speechRate; 
+    rateValue.textContent=speechRate.toFixed(1)+'x'; 
   }
 }
-speechSynthesis.onvoiceschanged = loadVoices;
+speechSynthesis.onvoiceschanged=loadVoices; 
+loadVoices();
 
-// ✅ 語音選擇
-voiceSelect.addEventListener("change", () => {
-  selectedVoice = voices[voiceSelect.value];
-  if (selectedVoice) {
-    localStorage.setItem("selectedVoiceName", selectedVoice.name);
-  }
+voiceSelect.addEventListener('change', ()=>{
+  selectedVoice=voices[voiceSelect.value]; 
+  if(selectedVoice) localStorage.setItem('selectedVoiceName', selectedVoice.name); 
 });
-
-// ✅ 自動啟用語音 checkbox
-autoEnable.addEventListener("change", () => {
-  localStorage.setItem("autoEnableSpeech", autoEnable.checked ? "1" : "0");
+rateSlider.addEventListener('input', ()=>{
+  speechRate=parseFloat(rateSlider.value); 
+  rateValue.textContent=speechRate.toFixed(1)+'x'; 
+  localStorage.setItem('speechRate', speechRate); 
 });
+autoEnable.addEventListener('change', ()=>localStorage.setItem('autoEnableSpeech', autoEnable.checked?'1':'0'));
 
-// ✅ 檢查是否需要自動啟用
-function autoStartIfEnabled() {
-  const auto = localStorage.getItem("autoEnableSpeech");
-  if (auto === "1") {
-    autoEnable.checked = true;
-    enableSpeech();
-  }
+function autoStartIfEnabled(){ 
+  if(localStorage.getItem('autoEnableSpeech')==='1'){ 
+    autoEnable.checked=true; 
+    enableSpeech(); 
+  } 
 }
 
-// ✅ 語音啟用函式（共用）
-function enableSpeech() {
-  if (speechEnabled) return;
-  const u = new SpeechSynthesisUtterance('');
-  u.lang = 'zh-TW';
+function enableSpeech(){
+  if(speechEnabled) return;
+  const u=new SpeechSynthesisUtterance(''); 
+  u.lang='zh-TW'; 
   window.speechSynthesis.speak(u);
-  speechEnabled = true;
-  enableBtn.style.display = 'none';
-  statusText.textContent = '已啟用語音，自動朗讀新訊息';
+  speechEnabled=true; 
+  enableBtn.style.display='none'; 
+  statusText.textContent='已啟用語音，自動朗讀新訊息';
 }
 
-// 點擊啟用語音
 enableBtn.addEventListener('click', enableSpeech);
 
-const speak = (text) => {
-    if(!speechEnabled || !text) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = selectedVoice?.lang || "zh-TW";
-    u.voice = selectedVoice || null;
-    u.rate = speechRate;
-    window.speechSynthesis.speak(u);
-};
+const speak=(text)=>new Promise(resolve=>{
+  if(!speechEnabled||!text) return resolve();
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text); 
+  u.lang=selectedVoice?.lang||'zh-TW'; 
+  u.voice=selectedVoice||null; 
+  u.rate=speechRate;
+  u.onend=()=>resolve(); 
+  u.onerror=()=>resolve(); 
+  window.speechSynthesis.speak(u);
+});
 
-// 重讀 / 停止
-document.getElementById('reread-btn').addEventListener('click', () => { speak(textArea.value); });
-document.getElementById('stop-btn').addEventListener('click', () => { window.speechSynthesis.cancel(); });
+/* ===== Queue 處理 ===== */
+async function processQueue(){
+  if(reading||messageQueue.length===0) return;
+  reading=true;
 
-// 輪詢最新 LINE 訊息
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxeMfXVE-EX-EYclDvIygXy55SGiQxxws4g6zbgLosUD5b9lcB2UUeNIMIwEniY8cQifQ/exec';
-setInterval(async ()=>{
+  while(messageQueue.length>0){
+    messageQueue = messageQueue.filter(msg => !processedMessageIds.has(msg.messageId));
+    updateQueueCount();
+    if(messageQueue.length===0) break;
+
+    const msg=messageQueue.shift(); 
+    queuedIds.delete(msg.messageId);
+
+    // 新訊息插入到最上方
+    const lines = textArea.value.split('\n');
+    lines.unshift(`[${new Date(msg.timestamp).toLocaleTimeString()}] ${msg.text} ✅`);
+    textArea.value = lines.join('\n');
+
+    // 自動滾動到最上方
+    textArea.scrollTop = 0;
+
+    lastTime.textContent='最後訊息時間：'+new Date(msg.timestamp).toLocaleString();
+
+    await speak(msg.text);
+
     try{
-        const res = await fetch(SHEET_URL);
-        const data = await res.json();
-        if(data.error){
-            statusDot.className="status-dot status-disconnected";
-            statusText.textContent="無法取得訊息";
-            return;
-        }
-        statusDot.className="status-dot status-connected";
-        statusText.textContent="已連線至 LINE Bot 服務";
+      const res=await fetch(SHEET_URL,{ method:'POST', body:JSON.stringify({ action:'markRead', rows:[msg.row] }) });
+      const json=await res.json().catch(()=>null);
 
-        if(data.text !== lastMessage){
-            lastMessage = data.text;
-            textArea.value = data.text;
-            speak(data.text);
-            if(data.timestamp){
-                const t = new Date(data.timestamp);
-                lastTime.textContent = '最後訊息時間：'+t.toLocaleString();
-            }
-        }
-    }catch(e){
-        console.error(e);
-        statusDot.className="status-dot status-disconnected";
-        statusText.textContent="服務連線失敗";
+      if(res.ok && json && json.status==='marked'){
+        processedMessageIds.add(msg.messageId);
+        showToast('已標記為已讀');
+      } else {
+        msg.retries=(msg.retries||0)+1;
+        if(msg.retries<3){ messageQueue.push(msg); queuedIds.add(msg.messageId); showToast('標記失敗，稍後重試'); }
+        else{ showToast('標記失敗（跳過）',3500); }
+      }
+    } catch(err){
+      console.error('POST markRead error:', err);
+      msg.retries=(msg.retries||0)+1;
+      if(msg.retries<3){ messageQueue.push(msg); queuedIds.add(msg.messageId); showToast('標記失敗（例外），稍後重試'); }
+      else{ showToast('標記失敗（跳過）',3500); }
     }
-},3000);
 
-// ✅ 頁面載入時檢查
+    await new Promise(r=>setTimeout(r,3000));
+    messageQueue = messageQueue.filter(msg => !processedMessageIds.has(msg.messageId));
+  }
+
+  reading=false; 
+  updateQueueCount();
+}
+
+/* ===== 輪詢 NEW 訊息 ===== */
+setInterval(async ()=>{
+  try{
+    const res=await fetch(SHEET_URL,{ cache:'no-store' });
+    const data=await res.json();
+
+    if(data.error){
+      statusDot.className="status-dot status-disconnected";
+      statusText.textContent="無法取得訊息";
+      console.error('GET error', data.error);
+      return;
+    }
+
+    statusDot.className="status-dot status-connected";
+    statusText.textContent="已連線至 LINE Bot 服務";
+
+    if(Array.isArray(data.messages)){
+      renderHistory(data.messages); // 倒序顯示並滾動到上方
+
+      for(const m of data.messages){
+        if(m.status!=='NEW') continue;
+        const mid=m.messageId||(m.timestamp+'|'+m.text.slice(0,20));
+        if(processedMessageIds.has(mid)||queuedIds.has(mid)) continue;
+
+        messageQueue.push({ messageId:mid, text:m.text, timestamp:m.timestamp, row:m.row, retries:0 });
+        queuedIds.add(mid);
+      }
+
+      updateQueueCount();
+      processQueue();
+    }
+  } catch(err){
+    console.error('輪詢失敗', err);
+    statusDot.className="status-dot status-disconnected";
+    statusText.textContent="服務連線失敗";
+  }
+},2000);
+
+/* ===== UI 按鈕 ===== */
+document.getElementById('reread-btn').addEventListener('click',()=>speak(textArea.value));
+document.getElementById('stop-btn').addEventListener('click',()=>window.speechSynthesis.cancel());
+
 autoStartIfEnabled();
 </script>
 </body>
