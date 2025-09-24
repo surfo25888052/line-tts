@@ -33,7 +33,7 @@ textarea::-webkit-scrollbar-track { background: #2d2d2d; border-radius: 4px; }
 
   <!-- 主訊息區（含歷史訊息） -->
   <div class="mb-6">
-    <textarea id="text-to-read" rows="18" class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 resize-none" placeholder="等待接收來自 LINE 的訊息..." readonly></textarea>
+    <textarea id="text-to-read" rows="18" class="w-full p-4 bg-[#2d2d2d] text-white text-2xl rounded-lg border-2 border-gray-600 resize-none" placeholder="等待接收來自 LINE 的訊息..." readonly></textarea>
     <div class="mt-1 text-gray-300 text-sm" id="queue-count">待朗讀訊息：0</div>
   </div>
 
@@ -107,7 +107,12 @@ function renderHistory(items){
   const reversed = [...items].reverse();
   textArea.value = reversed.map(msg=>{
     const status = msg.status==='READ'?'✅':'●';
-    const time = new Date(msg.timestamp).toLocaleTimeString();
+    const dateObj = new Date(msg.timestamp);
+    const time = `${dateObj.getFullYear()}/` +
+             `${(dateObj.getMonth()+1).toString().padStart(2,'0')}/` +
+             `${dateObj.getDate().toString().padStart(2,'0')} ` +
+             `${dateObj.getHours().toString().padStart(2,'0')}:` +
+             `${dateObj.getMinutes().toString().padStart(2,'0')}`;
     const isPrivate = msg.groupId === ""; // 假設群組欄位空白表示私人訊息
     const senderName = isPrivate ? (userNames[msg.userId] || msg.userId) : (groupNames[msg.groupId] || msg.groupId);
     return `[${time}] (${senderName})\n${msg.text} ${status}`;
