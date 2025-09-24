@@ -33,7 +33,7 @@ textarea::-webkit-scrollbar-track { background: #2d2d2d; border-radius: 4px; }
 
   <!-- 主訊息區（含歷史訊息） -->
   <div class="mb-6">
-    <textarea id="text-to-read" rows="12" class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 resize-none" placeholder="等待接收來自 LINE 的訊息..." readonly></textarea>
+    <textarea id="text-to-read" rows="18" class="w-full p-4 bg-[#2d2d2d] text-white text-lg rounded-lg border-2 border-gray-600 resize-none" placeholder="等待接收來自 LINE 的訊息..." readonly></textarea>
     <div class="mt-1 text-gray-300 text-sm" id="queue-count">待朗讀訊息：0</div>
   </div>
 
@@ -195,7 +195,7 @@ async function processQueue(){
     textArea.value = lines.join('\n');
 
     // 自動滾動到最上方
-    textArea.scrollTop = 0;
+     textArea.scrollTop = textArea.scrollHeight;
 
     lastTime.textContent='最後訊息時間：'+new Date(msg.timestamp).toLocaleString();
 
