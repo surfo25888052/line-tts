@@ -69,6 +69,17 @@ let speechEnabled=false, speechRate=0.8, voices=[], selectedVoice=null;
 let messageQueue=[], reading=false;
 const processedMessageIds=new Set(), queuedIds=new Set();
 
+// ===== 群組名稱對照表 =====
+const groupNames = {
+  "C11c0494d5391b8d5186f733bd48b4930": "三星社區中央廚房",
+  "C7308909bef662de6ffce4707dda58135": "愛心送餐志工群"
+};
+
+// ===== 私人訊息使用者對照表 =====
+const userNames = {
+  "U8fc492cc69f99001179805abab655632": "建豪"
+};
+
 const statusDot=document.getElementById('status-dot');
 const statusText=document.getElementById('status-text');
 const lastTime=document.getElementById('last-time');
@@ -97,8 +108,10 @@ function renderHistory(items){
   textArea.value = reversed.map(msg=>{
     const status = msg.status==='READ'?'✅':'●';
     const time = new Date(msg.timestamp).toLocaleTimeString();
-    return `[${time}] ${msg.text} ${status}`;
-  }).join('\n');
+    const isPrivate = msg.groupId === ""; // 假設群組欄位空白表示私人訊息
+    const senderName = isPrivate ? (userNames[msg.userId] || msg.userId) : (groupNames[msg.groupId] || msg.groupId);
+    return `[${time}] (${senderName})\n${msg.text} ${status}`;
+  }).join('\n\n');
 
   // 自動滾動到最上方
   textArea.scrollTop = textArea.scrollHeight;
