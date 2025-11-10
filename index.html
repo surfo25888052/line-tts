@@ -246,29 +246,42 @@ async function processQueue(){
   updateQueueCount();
 }
 
-/* ===== 輪詢 NEW 訊息 ===== */
+let lastFetchedTimestamp = null; // 記錄前一次 fetch 的最新訊息時間
+
+/* ===== 改良輪詢 NEW 訊息 ===== */
 setInterval(async ()=>{
   try{
-    const res=await fetch(SHEET_URL,{ cache:'no-store' });
-    const data=await res.json();
+    const res = await fetch(SHEET_URL, { cache:'no-store' });
+    const data = await res.json();
 
     if(data.error){
-      statusDot.className="status-dot status-disconnected";
-      statusText.textContent="無法取得訊息";
+      statusDot.className = "status-dot status-disconnected";
+      statusText.textContent = "無法取得訊息";
       console.error('GET error', data.error);
       return;
     }
 
-    statusDot.className="status-dot status-connected";
-    statusText.textContent="已連線至 LINE Bot 服務";
+    statusDot.className = "status-dot status-connected";
+    statusText.textContent = "已連線至 LINE Bot 服務";
 
-    if(Array.isArray(data.messages)){
-      renderHistory(data.messages); // 倒序顯示並滾動到上方
+    if(Array.isArray(data.messages) && data.messages.length > 0){
+      // 找到最新訊息 timestamp
+      const newestTimestamp = data.messages.reduce((max, m) => 
+        !max || new Date(m.timestamp) > new Date(max) ? m.timestamp : max
+      , null);
+
+      // 若最新訊息未更新，跳過
+      if(lastFetchedTimestamp && newestTimestamp === lastFetchedTimestamp) return;
+
+      lastFetchedTimestamp = newestTimestamp;
+
+      // 有更新才 render 與加入 queue
+      renderHistory(data.messages); 
 
       for(const m of data.messages){
         if(m.status!=='NEW') continue;
-        const mid=m.messageId||(m.timestamp+'|'+m.text.slice(0,20));
-        if(processedMessageIds.has(mid)||queuedIds.has(mid)) continue;
+        const mid = m.messageId || (m.timestamp + '|' + m.text.slice(0,20));
+        if(processedMessageIds.has(mid) || queuedIds.has(mid)) continue;
 
         messageQueue.push({ messageId:mid, text:m.text, timestamp:m.timestamp, row:m.row, retries:0 });
         queuedIds.add(mid);
@@ -282,7 +295,8 @@ setInterval(async ()=>{
     statusDot.className="status-dot status-disconnected";
     statusText.textContent="服務連線失敗";
   }
-},2000);
+}, 5000); // 5 秒輪詢一次
+
 
 /* ===== UI 按鈕 ===== */
 document.getElementById('reread-btn').addEventListener('click',()=>speak(textArea.value));
