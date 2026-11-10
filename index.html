@@ -163,140 +163,191 @@ rateSlider.addEventListener('input', ()=>{
 });
 autoEnable.addEventListener('change', ()=>localStorage.setItem('autoEnableSpeech', autoEnable.checked?'1':'0'));
 
-function autoStartIfEnabled(){ 
-  if(localStorage.getItem('autoEnableSpeech')==='1'){ 
-    autoEnable.checked=true; 
-    enableSpeech(); 
-  } 
+function autoStartIfEnabled(){
+  if(localStorage.getItem('autoEnableSpeech')==='1'){
+    autoEnable.checked=true;
+    enableSpeech();
+  }
 }
 
+// 瀏覽器可能封鎖未經使用者互動的朗讀；必須等實際語音完成才視為啟用。
+let activationAttempt=0, activationTimer=null;
 function enableSpeech(){
   if(speechEnabled) return;
-  const u=new SpeechSynthesisUtterance(''); 
-  u.lang='zh-TW'; 
-  window.speechSynthesis.speak(u);
-  speechEnabled=true; 
-  enableBtn.style.display='none'; 
-  statusText.textContent='已啟用語音，自動朗讀新訊息';
-}
+  const attempt=++activationAttempt;
+  clearTimeout(activationTimer);
 
+  const u=new SpeechSynthesisUtterance('語音已啟用');
+  u.lang=selectedVoice?.lang||'zh-TW';
+  u.voice=selectedVoice||null;
+  u.rate=speechRate;
+  let finished=false;
+  const finish=(ok,error)=>{
+    if(finished||attempt!==activationAttempt) return;
+    finished=true;
+    clearTimeout(activationTimer);
+    speechEnabled=ok;
+    enableBtn.style.display=ok?'none':'';
+    if(ok){
+      statusText.textContent='已啟用語音，自動朗讀新訊息';
+      processQueue();
+    }else{
+      statusText.textContent='語音未啟用，請點擊「啟用語音」';
+      console.error('語音啟用失敗:',error);
+      showToast('無法自動啟用語音，請點擊「啟用語音」',5000);
+    }
+  };
+  u.onend=()=>finish(true);
+  u.onerror=e=>finish(false,e.error||'unknown');
+  activationTimer=setTimeout(()=>{
+    window.speechSynthesis.cancel();
+    finish(false,'timeout');
+  },10000);
+  try{
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  }catch(err){
+    finish(false,err);
+  }
+}
 enableBtn.addEventListener('click', enableSpeech);
 
+// 只有語音完整播放 (onend) 才回報成功；錯誤或無法開始都不得標記已讀。
 const speak=(text)=>new Promise(resolve=>{
-  if(!speechEnabled||!text) return resolve();
-  window.speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text); 
-  u.lang=selectedVoice?.lang||'zh-TW'; 
-  u.voice=selectedVoice||null; 
+  if(!speechEnabled||!text) return resolve(false);
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang=selectedVoice?.lang||'zh-TW';
+  u.voice=selectedVoice||null;
   u.rate=speechRate;
-  u.onend=()=>resolve(); 
-  u.onerror=()=>resolve(); 
-  window.speechSynthesis.speak(u);
+  let finished=false, started=false;
+  const finish=(ok,error)=>{
+    if(finished) return;
+    finished=true;
+    clearTimeout(startTimer);
+    if(!ok) console.error('語音播放失敗:',error);
+    resolve(ok);
+  };
+  const startTimer=setTimeout(()=>{
+    if(!started){
+      window.speechSynthesis.cancel();
+      finish(false,'start-timeout');
+    }
+  },10000);
+  u.onstart=()=>{started=true;clearTimeout(startTimer);};
+  u.onend=()=>finish(true);
+  u.onerror=e=>finish(false,e.error||'unknown');
+  try{
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  }catch(err){
+    finish(false,err);
+  }
 });
 
 /* ===== Queue 處理 ===== */
 async function processQueue(){
-  if(reading||messageQueue.length===0) return;
+  if(reading||!speechEnabled||messageQueue.length===0) return;
   reading=true;
 
-  while(messageQueue.length>0){
-    messageQueue = messageQueue.filter(msg => !processedMessageIds.has(msg.messageId));
-    updateQueueCount();
-    if(messageQueue.length===0) break;
+  try{
+    while(speechEnabled&&messageQueue.length>0){
+      messageQueue=messageQueue.filter(msg=>!processedMessageIds.has(msg.messageId));
+      updateQueueCount();
+      if(messageQueue.length===0) break;
 
-    const msg=messageQueue.shift(); 
-    queuedIds.delete(msg.messageId);
+      const msg=messageQueue.shift();
+      updateQueueCount();
+      lastTime.textContent='最後訊息時間：'+new Date(msg.timestamp).toLocaleString();
 
-    // 新訊息插入到最上方
-    const lines = textArea.value.split('\n');
-    lines.unshift(`[${new Date(msg.timestamp).toLocaleTimeString()}] ${msg.text} ✅`);
-    textArea.value = lines.join('\n');
-
-    // 自動滾動到最上方
-     textArea.scrollTop = textArea.scrollHeight;
-
-    lastTime.textContent='最後訊息時間：'+new Date(msg.timestamp).toLocaleString();
-
-    await speak(msg.text);
-
-    try{
-      const res=await fetch(SHEET_URL,{ method:'POST', body:JSON.stringify({ action:'markRead', rows:[msg.row] }) });
-      const json=await res.json().catch(()=>null);
-
-      if(res.ok && json && json.status==='marked'){
-        processedMessageIds.add(msg.messageId);
-        showToast('已標記為已讀');
-      } else {
-        msg.retries=(msg.retries||0)+1;
-        if(msg.retries<3){ messageQueue.push(msg); queuedIds.add(msg.messageId); showToast('標記失敗，稍後重試'); }
-        else{ showToast('標記失敗（跳過）',3500); }
+      // 播放失敗時保留原訊息，等待使用者重新啟用語音。
+      if(!msg.spoken){
+        const played=await speak(msg.text);
+        if(!played){
+          messageQueue.unshift(msg);
+          speechEnabled=false;
+          enableBtn.style.display='';
+          statusText.textContent='朗讀失敗，請點擊「啟用語音」重試';
+          showToast('朗讀未完成，訊息仍保留待讀',5000);
+          break;
+        }
+        msg.spoken=true;
       }
-    } catch(err){
-      console.error('POST markRead error:', err);
-      msg.retries=(msg.retries||0)+1;
-      if(msg.retries<3){ messageQueue.push(msg); queuedIds.add(msg.messageId); showToast('標記失敗（例外），稍後重試'); }
-      else{ showToast('標記失敗（跳過）',3500); }
+
+      // 僅在確實播放完畢後才通知 GAS 標記已讀。
+      try{
+        const res=await fetch(SHEET_URL,{method:'POST',body:JSON.stringify({action:'markRead',rows:[msg.row]})});
+        const json=await res.json().catch(()=>null);
+
+        if(res.ok&&json&&json.status==='marked'){
+          processedMessageIds.add(msg.messageId);
+          queuedIds.delete(msg.messageId);
+          showToast('已標記為已讀');
+        }else{
+          msg.retries=(msg.retries||0)+1;
+          if(msg.retries<3){
+            messageQueue.push(msg);
+            showToast('標記失敗，稍後重試');
+          }else{
+            queuedIds.delete(msg.messageId);
+            processedMessageIds.add(msg.messageId);
+            showToast('朗讀完成，但標記已讀失敗',5000);
+          }
+        }
+      }catch(err){
+        console.error('POST markRead error:',err);
+        msg.retries=(msg.retries||0)+1;
+        if(msg.retries<3){
+          messageQueue.push(msg);
+          showToast('標記失敗（例外），稍後重試');
+        }else{
+          queuedIds.delete(msg.messageId);
+          processedMessageIds.add(msg.messageId);
+          showToast('朗讀完成，但標記已讀失敗',5000);
+        }
+      }
+
+      await new Promise(r=>setTimeout(r,3000));
     }
-
-    await new Promise(r=>setTimeout(r,3000));
-    messageQueue = messageQueue.filter(msg => !processedMessageIds.has(msg.messageId));
+  }finally{
+    reading=false;
+    updateQueueCount();
   }
-
-  reading=false; 
-  updateQueueCount();
 }
 
-let lastFetchedTimestamp = null; // 記錄前一次 fetch 的最新訊息時間
-
-/* ===== 改良輪詢 NEW 訊息 ===== */
+/* ===== 輪詢 NEW 訊息 ===== */
 setInterval(async ()=>{
   try{
-    const res = await fetch(SHEET_URL, { cache:'no-store' });
-    const data = await res.json();
-
-    if(data.error){
-      statusDot.className = "status-dot status-disconnected";
-      statusText.textContent = "無法取得訊息";
-      console.error('GET error', data.error);
+    const res=await fetch(SHEET_URL,{cache:'no-store'});
+    const data=await res.json();
+    if(!res.ok||data.error||!Array.isArray(data.messages)){
+      statusDot.className='status-dot status-disconnected';
+      statusText.textContent='無法取得訊息';
+      console.error('GET error / 訊息格式不符',data);
       return;
     }
 
-    statusDot.className = "status-dot status-connected";
-    statusText.textContent = "已連線至 LINE Bot 服務";
+    statusDot.className='status-dot status-connected';
+    statusText.textContent=speechEnabled
+      ? '已連線至 LINE Bot 服務，語音已啟用'
+      : '已連線至 LINE Bot 服務，請點擊「啟用語音」';
 
-    if(Array.isArray(data.messages) && data.messages.length > 0){
-      // 找到最新訊息 timestamp
-      const newestTimestamp = data.messages.reduce((max, m) => 
-        !max || new Date(m.timestamp) > new Date(max) ? m.timestamp : max
-      , null);
-
-      // 若最新訊息未更新，跳過
-      if(lastFetchedTimestamp && newestTimestamp === lastFetchedTimestamp) return;
-
-      lastFetchedTimestamp = newestTimestamp;
-
-      // 有更新才 render 與加入 queue
-      renderHistory(data.messages); 
-
-      for(const m of data.messages){
-        if(m.status!=='NEW') continue;
-        const mid = m.messageId || (m.timestamp + '|' + m.text.slice(0,20));
-        if(processedMessageIds.has(mid) || queuedIds.has(mid)) continue;
-
-        messageQueue.push({ messageId:mid, text:m.text, timestamp:m.timestamp, row:m.row, retries:0 });
-        queuedIds.add(mid);
-      }
-
-      updateQueueCount();
-      processQueue();
+    // 每次以訊息 ID 去重，不能只憑最新時間戳記略過未讀訊息。
+    renderHistory(data.messages);
+    for(const m of data.messages){
+      if(m.status!=='NEW') continue;
+      const mid=m.messageId||(m.timestamp+'|'+String(m.text||'').slice(0,20));
+      if(processedMessageIds.has(mid)||queuedIds.has(mid)) continue;
+      messageQueue.push({messageId:mid,text:m.text,timestamp:m.timestamp,row:m.row,retries:0,spoken:false});
+      queuedIds.add(mid);
     }
-  } catch(err){
-    console.error('輪詢失敗', err);
-    statusDot.className="status-dot status-disconnected";
-    statusText.textContent="服務連線失敗";
+    updateQueueCount();
+    processQueue();
+  }catch(err){
+    console.error('輪詢失敗',err);
+    statusDot.className='status-dot status-disconnected';
+    statusText.textContent='服務連線失敗';
   }
-}, 5000); // 5 秒輪詢一次
-
+},5000); // 5 秒輪詢一次
 
 /* ===== UI 按鈕 ===== */
 document.getElementById('reread-btn').addEventListener('click',()=>speak(textArea.value));
