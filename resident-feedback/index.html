@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#175b49">
+  <meta name="description" content="里民意見反映與通報表單">
+  <title>里民意見表</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1b2b28;background:#f4f8f6;font-synthesis:none}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;padding:18px 14px 40px}
+    main{max-width:600px;margin:0 auto}
+    .head{padding:22px 10px 16px;text-align:center}
+    .head h1{font-size:1.65rem;margin:6px 0 10px;letter-spacing:.025em}
+    .head p{color:#51645d;line-height:1.7;margin:0}
+    .panel{background:#fff;border:1px solid #dce7df;border-radius:18px;box-shadow:0 6px 28px rgba(17,54,40,.055);padding:22px 20px}
+    label{display:block;font-weight:700;margin:19px 0 8px;font-size:.96rem}
+    label:first-child{margin-top:0}
+    .req{color:#b72b2b}
+    input,textarea{display:block;width:100%;font:inherit;font-size:16px;color:#1b2b28;background:#fcfefd;border:1px solid #baccc3;border-radius:10px;padding:13px 14px;outline-offset:2px}
+    input:focus,textarea:focus{border-color:#208663;outline:2px solid #d2f0e1}
+    textarea{min-height:175px;resize:vertical;line-height:1.65}
+    .tip{font-size:.81rem;line-height:1.6;color:#61746c;margin:6px 0 0}
+    .status{border-radius:10px;padding:11px 12px;font-size:.9rem;line-height:1.6;margin:0 0 15px;background:#edf5f0;color:#275941}
+    .status.error{background:#fff2f0;color:#a12820}
+    button{width:100%;margin-top:24px;background:#175b49;border:none;border-radius:11px;color:white;font-size:1.05rem;font-weight:700;padding:15px;cursor:pointer}
+    button:disabled{cursor:not-allowed;opacity:.55}
+    .note{font-size:.83rem;line-height:1.65;color:#61746c;margin:14px 0 0;text-align:center}
+    .done{display:none;text-align:center;padding:34px 8px}
+    .done h2{margin:0 0 12px;color:#175b49;font-size:1.4rem}
+    .done p{line-height:1.8;color:#4d6157}
+    #closeButton{display:none}
+    @media(max-width:420px){.panel{padding:18px 15px}.head h1{font-size:1.48rem}}
+  </style>
+  <script src="./config.js"></script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+<main>
+  <header class="head"><h1>里民意見表</h1><p>有任何建議、疑問或需要協助的事項，歡迎填寫反映。</p></header>
+  <section class="panel">
+    <p id="status" class="status" role="status" aria-live="polite">正在連結 LINE 帳號…</p>
+    <form id="feedbackForm" novalidate>
+      <label for="residentName">姓名 <span class="req">*</span></label>
+      <input id="residentName" name="residentName" maxlength="60" autocomplete="name" required placeholder="請輸入姓名">
+      <label for="phone">聯絡電話</label>
+      <input id="phone" name="phone" type="tel" inputmode="tel" maxlength="40" autocomplete="tel" placeholder="方便聯絡的電話（可留空）">
+      <label for="address">地址</label>
+      <input id="address" name="address" maxlength="200" autocomplete="street-address" placeholder="相關地址（可留空）">
+      <label for="opinion">請提出您的意見 <span class="req">*</span></label>
+      <textarea id="opinion" name="opinion" maxlength="1600" required placeholder="請描述您的意見、建議或需要通報的事情"></textarea>
+      <p class="tip">送出後，官方 LINE 帳號會回覆受理訊息；填寫內容會存入意見紀錄表。</p>
+      <button type="submit" id="submitButton" disabled>送出里民意見</button>
+    </form>
+    <div class="done" id="done" aria-live="polite">
+      <h2>已送出意見</h2>
+      <p id="doneMessage">您的意見已傳送到官方 LINE 聊天室，請返回查看受理回覆。</p>
+      <button type="button" id="closeButton">返回 LINE</button>
+    </div>
+  </section>
+  <p class="note">僅蒐集處理意見所需資料。請勿填寫密碼、金融帳號等敏感資訊。</p>
+</main>
+<script>
+(function(){
+  'use strict';
+  const form=document.getElementById('feedbackForm');
+  const status=document.getElementById('status');
+  const submit=document.getElementById('submitButton');
+  const config=window.RESIDENT_FEEDBACK_CONFIG||{};
+  let ready=false, sending=false;
+  function setStatus(message,error){status.textContent=message;status.className=error?'status error':'status';}
+  function cleanOneLine(v){return String(v||'').replace(/[\r\n\u2028\u2029]+/g,' ').trim();}
+  function makeId(){const a=new Uint32Array(2);crypto.getRandomValues(a);return 'RF'+Date.now().toString(36).toUpperCase()+a[0].toString(36).toUpperCase()+a[1].toString(36).toUpperCase();}
+  function formData(){return {name:cleanOneLine(document.getElementById('residentName').value),phone:cleanOneLine(document.getElementById('phone').value),address:cleanOneLine(document.getElementById('address').value),opinion:document.getElementById('opinion').value.trim(),submissionId:makeId()};}
+  function formatMessage(v){return ['【里民意見表】','姓名：'+v.name,'電話：'+v.phone,'地址：'+v.address,'意見內容：',v.opinion,'表單編號：'+v.submissionId].join('\n');}
+  function submitByGAS(v){
+    const url=String(config.gasUrl||'');
+    if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/.test(url))throw new Error('GAS 網址尚未設定');
+    const f=document.createElement('form');f.method='POST';f.action=url;f.target='_self';f.style.display='none';
+    const values={form_action:'resident_feedback',access_token:liff.getAccessToken(),name:v.name,phone:v.phone,address:v.address,opinion:v.opinion,submission_id:v.submissionId};
+    if(!values.access_token)throw new Error('無法取得 LINE 登入資料，請重新開啟表單');
+    for(const [key,value] of Object.entries(values)){
+      const el=document.createElement('input');el.type='hidden';el.name=key;el.value=String(value);f.appendChild(el);
+    }
+    document.body.appendChild(f);f.submit();
+  }
+  async function init(){
+    if(!/^\d+-[a-zA-Z0-9]+$/.test(String(config.liffId||''))){setStatus('尚未設定 LIFF ID，請聯繫管理員。',true);return;}
+    if(!window.liff){setStatus('LINE 元件無法載入，請稍後重試。',true);return;}
+    try{
+      await liff.init({liffId:config.liffId,withLoginOnExternalBrowser:true});
+      if(!liff.isLoggedIn()){
+        if(!liff.isInClient())liff.login();
+        else throw new Error('LINE 登入尚未完成');
+        return;
+      }
+      ready=true;submit.disabled=false;
+      setStatus(liff.isInClient()?'已連線 LINE，可直接送出意見。':'LINE 已登入，送出後會返回受理頁面。');
+    }catch(err){setStatus('無法連接 LINE：'+(err.message||String(err)),true);}
+  }
+  form.addEventListener('submit',async function(event){
+    event.preventDefault();
+    if(!ready||sending)return;
+    const v=formData();
+    if(!v.name||!v.opinion){setStatus('請填寫姓名與意見內容。',true);return;}
+    const text=formatMessage(v);
+    if(text.length>4900){setStatus('填寫內容過長，請縮短後再送出。',true);return;}
+    sending=true;submit.disabled=true;setStatus('正在送出，請勿重複點擊…');
+    try{
+      const context=liff.getContext&&liff.getContext();
+      if(liff.isInClient()&&context&&context.type==='utou'){
+        await liff.sendMessages([{type:'text',text}]);
+        form.style.display='none';status.style.display='none';document.getElementById('done').style.display='block';
+        const closeButton=document.getElementById('closeButton');closeButton.style.display='block';
+      }else{
+        // GitHub Pages 原始連結／外部瀏覽器：跨來源 POST 改採瀏覽器表單導向，避免 CORS 靜默失敗。
+        submitByGAS(v);
+        return;
+      }
+    }catch(err){
+      // 若 LIFF 回報送訊失敗，改用 GAS 提交，不自行宣稱 LINE 已送達。
+      try{submitByGAS(v);return;}catch(fallbackError){setStatus('送出失敗：'+(fallbackError.message||err.message||String(err)),true);}
+    }
+    sending=false;submit.disabled=false;
+  });
+  document.getElementById('closeButton').addEventListener('click',function(){if(window.liff&&liff.isInClient())liff.closeWindow();});
+  init();
+})();
+</script>
+</body>
+</html>

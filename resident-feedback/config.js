@@ -1,0 +1,1 @@
+// GitHub Pages 公開設定：不得放 LINE Channel Access Token。\nwindow.RESIDENT_FEEDBACK_CONFIG = Object.freeze({\n  liffId: 'YOUR_LIFF_ID',\n  gasUrl: 'YOUR_GAS_WEB_APP_URL'\n});\n
