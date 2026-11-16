@@ -31,6 +31,9 @@
     .done h2{margin:0 0 12px;color:#175b49;font-size:1.4rem}
     .done p{line-height:1.8;color:#4d6157}
     #closeButton{display:none}
+    #manualText{min-height:240px;text-align:left;margin-top:12px;white-space:pre-wrap}
+    #manual p{text-align:left}
+    #manual h2{text-align:center}
     @media(max-width:420px){.panel{padding:18px 15px}.head h1{font-size:1.48rem}}
   </style>
   <script src="./config.js"></script>
@@ -57,6 +60,13 @@
       <h2>已送出意見</h2>
       <p id="doneMessage">您的意見已傳送到官方 LINE 聊天室，請返回查看受理回覆。</p>
       <button type="button" id="closeButton">返回 LINE</button>
+    </div>
+    <div class="done" id="manual" aria-live="polite">
+      <h2>尚未傳送到 LINE</h2>
+      <p>電腦瀏覽器無法直接將文字傳送到 LINE 聊天室。請複製下方內容，在 LINE 電腦版找到官方帳號「三星里長簡新發」（@971zpojs），貼上並按「傳送」。</p>
+      <textarea id="manualText" readonly aria-label="尚未傳送的里民意見文字"></textarea>
+      <button type="button" id="copyManual">複製完整意見</button>
+      <p id="copyHint">必須在 LINE 聊天室按下「傳送」，GAS 才會收到並記錄這筆意見。</p>
     </div>
   </section>
   <p class="note">僅蒐集處理意見所需資料。請勿填寫密碼、金融帳號等敏感資訊。</p>
@@ -85,9 +95,18 @@
     }
     document.body.appendChild(f);f.submit();
   }
+  function isMobileDevice(){return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');}
+  function showManualHandoff(text){
+    document.getElementById('manualText').value=text;
+    form.style.display='none';status.style.display='none';
+    document.getElementById('manual').style.display='block';
+    sending=false;submit.disabled=false;
+  }
   function openExistingOfficialAccount(text){
     const oa=String(config.oaLineId||'').trim();
     if(!/^@[a-zA-Z0-9._-]{3,40}$/.test(oa))throw new Error('尚未設定原官方帳號 LINE ID');
+    // LINE OA deep links are for mobile. Never redirect desktop browsers to line.me's home page.
+    if(!isMobileDevice()){showManualHandoff(text);return;}
     // LINE's official oaMessage URL prefills the message, but does NOT send it.
     const url='https://line.me/R/oaMessage/'+encodeURIComponent(oa)+'/?'+encodeURIComponent(text);
     setStatus('正在開啟原官方帳號聊天室。請確認文字後，在 LINE 再按一次「傳送」才算完成。');
@@ -95,6 +114,11 @@
     window.location.assign(url);
   }
   async function init(){
+    if(!isMobileDevice()){
+      ready=true;submit.disabled=false;
+      setStatus('目前使用電腦瀏覽器。填寫後請複製完整意見，至原官方 LINE 聊天室貼上並按「傳送」。');
+      return;
+    }
     const hasLiff=/^\d+-[a-zA-Z0-9]+$/.test(String(config.liffId||''));
     if(!hasLiff || !window.liff){
       if(/^@[a-zA-Z0-9._-]{3,40}$/.test(String(config.oaLineId||''))){
@@ -142,6 +166,22 @@
       try{openExistingOfficialAccount(text);return;}catch(fallbackError){setStatus('送出失敗：'+(fallbackError.message||err.message||String(err)),true);}
     }
     sending=false;submit.disabled=false;
+  });
+  document.getElementById('copyManual').addEventListener('click',async function(){
+    const area=document.getElementById('manualText');
+    const hint=document.getElementById('copyHint');
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(area.value);
+      }else{
+        area.focus();area.select();
+        if(!document.execCommand('copy'))throw new Error('Copy unavailable');
+      }
+      hint.textContent='已複製。請開啟 LINE 電腦版，找到「三星里長簡新發」，貼上並按「傳送」。';
+    }catch(err){
+      area.focus();area.select();
+      hint.textContent='無法自動複製，文字已選取。請按 Ctrl+C 複製，再貼到 LINE 聊天室送出。';
+    }
   });
   document.getElementById('closeButton').addEventListener('click',function(){if(window.liff&&liff.isInClient())liff.closeWindow();});
   init();
