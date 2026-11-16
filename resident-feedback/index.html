@@ -31,9 +31,6 @@
     .done h2{margin:0 0 12px;color:#175b49;font-size:1.4rem}
     .done p{line-height:1.8;color:#4d6157}
     #closeButton{display:none}
-    #manualText{min-height:240px;text-align:left;margin-top:12px;white-space:pre-wrap}
-    #manual p{text-align:left}
-    #manual h2{text-align:center}
     @media(max-width:420px){.panel{padding:18px 15px}.head h1{font-size:1.48rem}}
   </style>
   <script src="./config.js"></script>
@@ -53,20 +50,13 @@
       <input id="address" name="address" maxlength="200" autocomplete="street-address" placeholder="相關地址（可留空）">
       <label for="opinion">請提出您的意見 <span class="req">*</span></label>
       <textarea id="opinion" name="opinion" maxlength="1600" required placeholder="請描述您的意見、建議或需要通報的事情"></textarea>
-      <p class="tip">填好後將開啟原官方 LINE 聊天室，請在 LINE 按「傳送」才會正式受理；官方帳號收到後會回覆並記錄意見。</p>
+      <p class="tip">從原 LINE 官方帳號聊天室開啟此表單，可用本人 LINE 帳號送出意見，並將資料存進 Google 試算表；其他方式開啟時，須依結果頁說明手動傳送到官方帳號。</p>
       <button type="submit" id="submitButton" disabled>送出里民意見</button>
     </form>
     <div class="done" id="done" aria-live="polite">
       <h2>已送出意見</h2>
-      <p id="doneMessage">您的意見已傳送到官方 LINE 聊天室，請返回查看受理回覆。</p>
+      <p id="doneMessage">請依 GAS 結果頁核對是否已記錄，並確認 LINE 聊天訊息是否真的送達。</p>
       <button type="button" id="closeButton">返回 LINE</button>
-    </div>
-    <div class="done" id="manual" aria-live="polite">
-      <h2>尚未傳送到 LINE</h2>
-      <p>電腦瀏覽器無法直接將文字傳送到 LINE 聊天室。請複製下方內容，在 LINE 電腦版找到官方帳號「三星里長簡新發」（@971zpojs），貼上並按「傳送」。</p>
-      <textarea id="manualText" readonly aria-label="尚未傳送的里民意見文字"></textarea>
-      <button type="button" id="copyManual">複製完整意見</button>
-      <p id="copyHint">必須在 LINE 聊天室按下「傳送」，GAS 才會收到並記錄這筆意見。</p>
     </div>
   </section>
   <p class="note">僅蒐集處理意見所需資料。請勿填寫密碼、金融帳號等敏感資訊。</p>
@@ -78,110 +68,79 @@
   const status=document.getElementById('status');
   const submit=document.getElementById('submitButton');
   const config=window.RESIDENT_FEEDBACK_CONFIG||{};
-  let ready=false, sending=false;
+  let ready=false,sending=false,formId=null;
+  submit.disabled=true;
   function setStatus(message,error){status.textContent=message;status.className=error?'status error':'status';}
   function cleanOneLine(v){return String(v||'').replace(/[\r\n\u2028\u2029]+/g,' ').trim();}
   function makeId(){const a=new Uint32Array(2);crypto.getRandomValues(a);return 'RF'+Date.now().toString(36).toUpperCase()+a[0].toString(36).toUpperCase()+a[1].toString(36).toUpperCase();}
-  function formData(){return {name:cleanOneLine(document.getElementById('residentName').value),phone:cleanOneLine(document.getElementById('phone').value),address:cleanOneLine(document.getElementById('address').value),opinion:document.getElementById('opinion').value.trim(),submissionId:makeId()};}
-  function formatMessage(v){return ['【里民意見表】','姓名：'+v.name,'電話：'+v.phone,'地址：'+v.address,'意見內容：',v.opinion,'表單編號：'+v.submissionId].join('\n');}
-  function submitByGAS(v){
+  function getFormData(){
+    if(!formId)formId=makeId();
+    return {id:formId,name:cleanOneLine(document.getElementById('residentName').value),
+      phone:cleanOneLine(document.getElementById('phone').value),address:cleanOneLine(document.getElementById('address').value),
+      opinion:document.getElementById('opinion').value.trim()};
+  }
+  function formatMessage(v){return ['【里民意見表】','姓名：'+v.name,'電話：'+v.phone,'地址：'+v.address,
+    '意見內容：',v.opinion,'表單編號：'+v.id].join('\n');}
+  function canSendToCurrentChat(){
+    const context=liff.getContext&&liff.getContext();
+    return !!(liff.isInClient()&&context&&context.type==='utou');
+  }
+  function submitToGAS(v,sent){
     const url=String(config.gasUrl||'');
-    if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/.test(url))throw new Error('GAS 網址尚未設定');
+    if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/.test(url))throw new Error('GAS 網址未設定。');
+    const token=liff.getAccessToken&&liff.getAccessToken();
+    if(!token)throw new Error('LINE 登入資訊已失效，請由原聊天室重新開啟表單。');
+    const payload={form_action:'resident_feedback',access_token:token,
+      name:v.name,phone:v.phone,address:v.address,opinion:v.opinion,
+      submission_id:v.id,line_send_status:sent?'liff_sent':'manual_required'};
     const f=document.createElement('form');f.method='POST';f.action=url;f.target='_self';f.style.display='none';
-    const values={form_action:'resident_feedback',access_token:liff.getAccessToken(),name:v.name,phone:v.phone,address:v.address,opinion:v.opinion,submission_id:v.submissionId};
-    if(!values.access_token)throw new Error('無法取得 LINE 登入資料，請重新開啟表單');
-    for(const [key,value] of Object.entries(values)){
-      const el=document.createElement('input');el.type='hidden';el.name=key;el.value=String(value);f.appendChild(el);
+    for(const [key,value] of Object.entries(payload)){
+      const field=document.createElement('input');field.type='hidden';field.name=key;field.value=String(value);f.appendChild(field);
     }
-    document.body.appendChild(f);f.submit();
-  }
-  function isMobileDevice(){return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');}
-  function showManualHandoff(text){
-    document.getElementById('manualText').value=text;
-    form.style.display='none';status.style.display='none';
-    document.getElementById('manual').style.display='block';
-    sending=false;submit.disabled=false;
-  }
-  function openExistingOfficialAccount(text){
-    const oa=String(config.oaLineId||'').trim();
-    if(!/^@[a-zA-Z0-9._-]{3,40}$/.test(oa))throw new Error('尚未設定原官方帳號 LINE ID');
-    // LINE OA deep links are for mobile. Never redirect desktop browsers to line.me's home page.
-    if(!isMobileDevice()){showManualHandoff(text);return;}
-    // LINE's official oaMessage URL prefills the message, but does NOT send it.
-    const url='https://line.me/R/oaMessage/'+encodeURIComponent(oa)+'/?'+encodeURIComponent(text);
-    setStatus('正在開啟原官方帳號聊天室。請確認文字後，在 LINE 再按一次「傳送」才算完成。');
-    sending=false;submit.disabled=false;
-    window.location.assign(url);
+    document.body.appendChild(f);
+    f.submit();
   }
   async function init(){
-    if(!isMobileDevice()){
-      ready=true;submit.disabled=false;
-      setStatus('目前使用電腦瀏覽器。填寫後請複製完整意見，至原官方 LINE 聊天室貼上並按「傳送」。');
-      return;
-    }
-    const hasLiff=/^\d+-[a-zA-Z0-9]+$/.test(String(config.liffId||''));
-    if(!hasLiff || !window.liff){
-      if(/^@[a-zA-Z0-9._-]{3,40}$/.test(String(config.oaLineId||''))){
-        ready=true;submit.disabled=false;
-        setStatus('已準備就緒。填寫後會開啟原 LINE 官方帳號聊天室，請再按一次「傳送」。');
-      }else setStatus('尚未設定官方帳號 LINE ID，請聯繫管理員。',true);
-      return;
-    }
+    if(!window.liff){setStatus('無法載入 LINE 元件，請重新開啟表單。',true);return;}
+    if(!/^\d+-[A-Za-z0-9]+$/.test(String(config.liffId||''))){setStatus('LIFF ID 尚未設定。',true);return;}
     try{
       await liff.init({liffId:config.liffId,withLoginOnExternalBrowser:true});
       if(!liff.isLoggedIn()){
         if(!liff.isInClient())liff.login();
-        else throw new Error('LINE 登入尚未完成');
+        else throw new Error('LIFF 登入未完成。');
         return;
       }
       ready=true;submit.disabled=false;
-      setStatus(liff.isInClient()?'已連線 LINE，可直接送出意見。':'LINE 已登入，送出後會返回受理頁面。');
-    }catch(err){if(/^@[a-zA-Z0-9._-]{3,40}$/.test(String(config.oaLineId||''))){ready=true;submit.disabled=false;setStatus('已改用原官方帳號聊天模式，填寫後須再按「傳送」。');}else{setStatus('無法連接 LINE：'+(err.message||String(err)),true);}}
+      setStatus(canSendToCurrentChat() ?
+        'LINE 已登入。如果您是從「三星里長簡新發」聊天室開啟，送出後會以本人身分傳送意見，再由 GAS 存入試算表。' :
+        'LINE 已登入。此入口無法自動傳送聊天訊息；資料入庫後，請依結果頁提示手動傳送到原官方帳號。');
+    }catch(err){setStatus('無法連線 LINE：'+(err.message||String(err)),true);}
   }
-  form.addEventListener('submit',async function(event){
-    event.preventDefault();
+  form.addEventListener('submit',async function(ev){
+    ev.preventDefault();
     if(!ready||sending)return;
-    const v=formData();
-    if(!v.name||!v.opinion){setStatus('請填寫姓名與意見內容。',true);return;}
-    const text=formatMessage(v);
-    if(text.length>4900){setStatus('填寫內容過長，請縮短後再送出。',true);return;}
-    sending=true;submit.disabled=true;setStatus('正在送出，請勿重複點擊…');
-    try{
-      if(!window.liff||!/^\d+-[a-zA-Z0-9]+$/.test(String(config.liffId||''))){
-        openExistingOfficialAccount(text);
-        return;
+    const v=getFormData();
+    if(!v.name||!v.opinion){setStatus('姓名與意見內容為必填。',true);return;}
+    if(v.opinion.length>1600){setStatus('意見內容不得超過 1600 字。',true);return;}
+    const message=formatMessage(v);
+    if(message.length>4900){setStatus('送至 LINE 的訊息過長。',true);return;}
+    if(!(liff.getAccessToken&&liff.getAccessToken())){setStatus('LINE 登入資訊失效，請重新開啟表單，尚未送訊。',true);return;}
+    sending=true;submit.disabled=true;
+    let sent=false;
+    if(canSendToCurrentChat()){
+      setStatus('正在由您本人傳送到 LINE 聊天室…');
+      try{
+        await liff.sendMessages([{type:'text',text:message}]);
+        sent=true;
+      }catch(err){
+        // No claim of LINE delivery; continue as a manual-send case.
+        console.warn('LIFF sendMessages failed: ',err&&err.code||'unknown');
       }
-      const context=liff.getContext&&liff.getContext();
-      if(liff.isInClient()&&context&&context.type==='utou'){
-        await liff.sendMessages([{type:'text',text}]);
-        form.style.display='none';status.style.display='none';document.getElementById('done').style.display='block';
-        const closeButton=document.getElementById('closeButton');closeButton.style.display='block';
-      }else{
-        // LIFF was opened outside the original OA chat: use the official deep link.
-        openExistingOfficialAccount(text);
-        return;
-      }
-    }catch(err){
-      // Never report delivery unless LINE confirmed sending. OA chat requires one last tap.
-      try{openExistingOfficialAccount(text);return;}catch(fallbackError){setStatus('送出失敗：'+(fallbackError.message||err.message||String(err)),true);}
     }
-    sending=false;submit.disabled=false;
-  });
-  document.getElementById('copyManual').addEventListener('click',async function(){
-    const area=document.getElementById('manualText');
-    const hint=document.getElementById('copyHint');
-    try{
-      if(navigator.clipboard&&navigator.clipboard.writeText){
-        await navigator.clipboard.writeText(area.value);
-      }else{
-        area.focus();area.select();
-        if(!document.execCommand('copy'))throw new Error('Copy unavailable');
-      }
-      hint.textContent='已複製。請開啟 LINE 電腦版，找到「三星里長簡新發」，貼上並按「傳送」。';
-    }catch(err){
-      area.focus();area.select();
-      hint.textContent='無法自動複製，文字已選取。請按 Ctrl+C 複製，再貼到 LINE 聊天室送出。';
-    }
+    setStatus(sent?'LINE 已回報訊息送出，正在存入 Google 試算表…':
+      '正在存入 Google 試算表；您還需要到原官方 LINE 聊天室手動傳送。');
+    try{submitToGAS(v,sent);}
+    catch(err){setStatus((sent?'LINE 訊息可能已送出，但':'')+'資料庫提交失敗：'+(err.message||String(err)),true);sending=false;submit.disabled=false;}
   });
   document.getElementById('closeButton').addEventListener('click',function(){if(window.liff&&liff.isInClient())liff.closeWindow();});
   init();
