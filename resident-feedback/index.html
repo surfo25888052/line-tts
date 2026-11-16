@@ -130,7 +130,7 @@
       sending=false;submit.disabled=false;
       return;
     }
-    setStatus('LINE 已確認送訊，正在自動存入 Google 試算表…');
+    setStatus('');
     try{submitToGAS(v);}
     catch(err){setStatus('LINE 已送訊，但資料庫提交發生錯誤：'+(err.message||String(err))+'。請勿重複送出 LINE 訊息。',true);sending=false;submit.disabled=false;}
   });
