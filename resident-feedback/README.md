@@ -1,45 +1,51 @@
-# 里民意見表｜GitHub Pages + Google Sheets + GAS + LINE
+# 里民意見表｜既有 LINE 官方帳號 + GitHub Pages + GAS + Google 試算表
 
-**功能僅三件事：** 填寫意見、存入試算表、由 LINE 官方帳號回覆原填寫者。無管理後台、帳密系統、額外伺服器、群組轉發或案件狀態流程。
+## 最簡單、不另建 LINE 官方帳號或 LIFF 的方法
 
-## 專案檔案
+1. 在現有 LINE 官方帳號的圖文選單設定此 GitHub Pages 網址：`https://surfo25888052.github.io/line-tts/resident-feedback/`。
+2. 里民填寫姓名、電話、地址及反映意見，點擊「送出里民意見」。
+3. 網頁會依 LINE 官方文件的 `https://line.me/R/oaMessage/.../?` 格式，**開啟既有 LINE 官方帳號聊天室，預先填入完整意見**。
+4. **里民必須在 LINE 再按一次「傳送」**。這一步不能由一般 GitHub 網站自動代按。只有實際送出聊天訊息後，才算完成通報。
+5. GAS 的 LINE Webhook 收到里民本人訊息，寫入綁定的 Google 試算表 `里民意見` 工作表，並用 Messaging API Reply API 回覆表單編號。管理員在原官方帳號聊天室可辨認送件人。
 
-- `index.html`：公開的行動版里民意見表（姓名、電話、地址、意見）。
-- `config.js`：填入你的 LIFF ID 與 GAS Web App URL；不放任何密鑰。
-- `Code.gs`：獨立 GAS 後端程式由本次交付的 ZIP 提供，請在新建 Google 試算表的 Apps Script 內貼上；本公開 GitHub Pages 目錄只放前端。
-- `tests/test.cjs`：由本次交付 ZIP 提供的離線模擬測試。
+此方法不需要 LIFF、LINE Login Channel、LINE 官方帳號重建或其他服務；但需要 **LINE Messaging API 的 Webhook 指向本 GAS，且必須有可用的 Channel Access Token**。GAS 現在能以既有 Channel ID 與 Channel secret 自動申請 15 分鐘有效的 stateless token。
 
-## 收件與回覆
+## 從既有官方帳號取得所需資訊
 
-**建議入口（LINE 官方帳號聊天視窗）：** 讓里民從 `https://liff.line.me/你的LIFF_ID` 開啟此 GitHub Pages 頁面。這個 LIFF 連結會顯示同一個 GitHub 頁面，啟用 `chat_message.write` 後，`liff.sendMessages()` 會以里民本人身份，把完整意見直接發到官方帳號聊天室。GAS 收到該文字 Webhook 後，記錄試算表，並以 Reply API 回覆受理編號。管理員在原本的 LINE 聊天室直接看到是誰反映、反映了什麼。
+既有 OA：`@971zpojs`。在 LINE Official Account Manager（官方帳號管理後台）→ 設定 → Messaging API 中可看到 **Channel ID** 和 **Channel secret**。這兩者請只填入 Apps Script 的 `Script Properties`（指令碼屬性），不要貼在公開 GitHub 或交給任何人。Channel secret 是敏感憑證。
 
-**一般 GitHub Pages 網址：** 也能填寫。LIFF 登入後以表單 POST 送至 GAS；GAS 向 LINE 取得正確的 User ID、寫入試算表，再以 Push API 推播給本人。這種情況不是「里民傳訊到官方帳號聊天室」，因此如果管理員要在 LINE 立即收到通知，請設定 `ADMIN_TO`（管理員 User ID 或官方帳號所在群組 ID）。
+| Script Property | 作用 | 必填 |
+|---|---|---|
+| `LINE_CHANNEL_ID` | 既有 Messaging API Channel ID（數字） | 是，若未提供 Access Token |
+| `LINE_CHANNEL_SECRET` | 同一頻道的 Channel secret（機密） | 是，若未提供 Access Token |
+| `LINE_CHANNEL_ACCESS_TOKEN` | 可選：若已有可用 token，直接使用而不申請 stateless token | 否 |
+| `ADMIN_TO` | 可選：另通知某個管理員 LINE User ID 或群組 ID | 否 |
+| `WEBHOOK_KEY` | 可選：Webhook 網址密鑰；設定後需加在 LINE Webhook URL | 否 |
 
-> **重要：** 若你希望里民的完整意見直接出現在官方帳號既有聊天室，選單應設定 **LIFF 網址**，而不是原始 GitHub Pages 網址。LIFF 的 Endpoint URL 仍然是這份 GitHub Pages 網址。LINE 官方文件規定，只有從聊天開啟的 LIFF 瀏覽器才可以使用 `liff.sendMessages()`。
+GAS Token 作業：`getLineToken_()` 先採用 `LINE_CHANNEL_ACCESS_TOKEN`；否則使用 Channel ID + secret 呼叫 `POST https://api.line.me/oauth2/v3/token`，並在 `CacheService` 快取到期前的短效 Token。Stateless token 的發行不影響舊的長期 Token。
 
-## 按照你的部署順序設定
+## 綁定 Google 試算表的部署
 
-1. **Google Drive → 新增 → Google 試算表**。建立一份空白表，選「擴充功能（Extensions）→ Apps Script」，刪除預設內容，把 `Code.gs` 全部貼入。若你建立的是 `.xlsx` 檔，請先轉為**原生 Google 試算表**，以便綁定 GAS。
-2. 在 GAS 的「專案設定（Project Settings）→ 指令碼屬性（Script Properties）」新增 `LINE_CHANNEL_ACCESS_TOKEN`，內容是官方帳號 Messaging API 的 Channel Access Token。不要把 Token 放在 GitHub。若需要把一般 GitHub 網址表單也通知給管理員，再新增 `ADMIN_TO`，值為管理員的 LINE User ID 或 LINE 群組 ID。**這兩個都是私密設定**。
-3. 在 GAS 編輯器手動執行 `setupSheet()` 一次並允許權限。系統會建立 `里民意見` 工作表及標題欄（也可在第一筆提交時自動建立）。
-4. 選「部署（Deploy）→ 新增部署（New deployment）→ 網頁應用程式（Web app）」，`Execute as`（執行身分）選 **Me（我）**，`Who has access`（存取權限）選 **Anyone（所有人）**；複製 `/exec` 網址。
-5. 在 LINE Developers 的**與官方帳號同一個 Provider（提供者）**下建立 LINE Login Channel，在 LIFF 分頁建立 LIFF App。`Endpoint URL` 設成 GitHub Pages 表單網址；Scopes 勾選 `profile` 與 `chat_message.write`，網頁開啟方式建議 Full（全螢幕）。取得 LIFF ID。
-6. 編輯 GitHub Pages 目錄下的 `config.js`：`liffId` 改成真實 LIFF ID，`gasUrl` 改為步驟 4 的 `/exec` 網址。GitHub Pages 發布後，確認 `/resident-feedback/` 可開啟。
-7. 到 LINE Developers → Messaging API → Webhook settings（Webhook 設定），貼入同一支 GAS `/exec` 網址並開啟 Use webhook（使用 Webhook）；在官方帳號選單或圖文選單加入 **LIFF 網址**：`https://liff.line.me/你的LIFF_ID`。若只接受一般 GitHub 頁面連結也可，但記得 `ADMIN_TO`。
-8. 用**測試 LINE 帳號**從官方帳號聊天室開啟表單，填寫測試意見送出。驗證（a）原聊天室出現填寫者自己傳出的意見，（b）原聊天室收到官方帳號受理回覆，（c）Google 試算表新增一列、LINE User ID 與表單編號一致。
+1. 既有試算表：**三星里長里民意見表**。在其選單 **擴充功能 → Apps Script** 貼上 `Code.gs` 全部程式。若你已部署過前版，請以本版取代原版，再做「部署 → 管理部署 → 編輯 → 新版本」更新原 `/exec`。
+2. 在「專案設定 → 指令碼屬性」新增 `LINE_CHANNEL_ID` 與 `LINE_CHANNEL_SECRET`，不要把 secret 貼到前端。
+3. 手動執行 `setupSheet()`（建立 `里民意見` 工作表）；再執行 `testLineConnection()`（只查詢現有 LINE bot 資訊、不發訊息）。
+4. GAS 網頁應用程式由 **我（Me）** 執行，存取權限 **所有人（Anyone）**。
+5. 在**既有** OA 管理後台的「設定 → Messaging API」準備修改 Webhook URL，但在確認不再需要 OakMega 的舊 webhook 處理前，**不要按儲存**。每個頻道只能設定一個 Webhook，切換後舊 OakMega 服務不再收到事件。
+6. 在正式切換後用另一支 LINE 測試帳號開啟 GitHub 表單、填寫內容、在原 OA 聊天室**按傳送**，然後核對該 LINE 聊天回覆與試算表新增列。
 
-### 欄位
+## 進階選配：LIFF 全自動傳送
 
-`填表時間｜送出方式｜表單編號｜LINE使用者ID｜LINE顯示名稱｜姓名｜聯絡電話｜地址｜反映意見｜LINE回覆狀態`
+若日後取得既有 OA 所屬 Provider 權限，可建立一個 **LINE Login channel（不是另一個 LINE 官方帳號）** 與 LIFF，配置 `config.js` 的 `liffId`，在原官方帳號聊天窗透過 LIFF URL 開啟後可用 `liff.sendMessages` 直接傳送；這仍須在正確聊天室與 `chat_message.write` 權限下才有用。一般 GitHub Pages 入口不需要 LIFF。
 
-### 不要誤切舊 Webhook
+## 程式保留的其它功能
 
-LINE 一個 Messaging API Channel 同時間只有一個 Webhook URL。將網址改成這份 GAS 後，原本 `LINE_to_Sheet` 及群組轉發 GAS **不再收到新的 Webhook**。本版本只處理里民意見；若仍需舊群組轉發，不能直接替換而不整合。
+- 原表單四個欄位，新增時間／表單編號／LINE 使用者 ID／LINE 顯示名稱／回覆結果共 10 欄。
+- 由 LINE 訊息發出的表單會去重並用 Reply API 回覆本人。
+- 可選的 `ADMIN_TO` 推播，不會傳送到未指定的人。
+- GAS `doPost(e)` 不能取得 LINE 要求的 `x-line-signature` header，本架構無法提供等價簽章驗證；可使用保密 `WEBHOOK_KEY` 降低濫用，但不是相同安全性。
+- 本地 Node 測試屬模擬，不代表正式 Webhook、GAS 或手機端已驗收。
 
-### 限制
-
-- LINE 推播需對方與官方帳號有可接收訊息的關係；對方封鎖官方帳號時可能收不到 Push。
-- GAS `doPost(e)` 不提供 HTTP Request Headers，所以此極簡版不能核驗 `x-line-signature`。有需要可在 Script Properties 設 `WEBHOOK_KEY`，並在 LINE Webhook URL 使用 `/exec?key=該值`，至少減少公開端點遭濫用的風險；但此方法不等於 LINE 簽章驗證。
-- 使用者填寫個資僅存於你建立的 Google 試算表；GitHub Pages 不保存資料、Token 或 LINE Access Token。
-- LIFF 與官方帳號應位於同一個 Provider，否則一般 GitHub 網址模式取得的 LINE User ID 可能與 Messaging API 不一致。
-- 上述為部署步驟，仍須以實際 LINE / GAS 操作驗收；原始碼測試不代表正式訊息已送達。
+參考 LINE 官方文件：
+- https://developers.line.biz/en/docs/messaging-api/using-line-url-scheme/
+- https://developers.line.biz/en/reference/messaging-api/#issue-stateless-channel-access-token
+- https://developers.line.biz/en/tips/2026/07/23/using-multiple-api-tools/

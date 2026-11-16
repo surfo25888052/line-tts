@@ -40,7 +40,7 @@
 <main>
   <header class="head"><h1>里民意見表</h1><p>有任何建議、疑問或需要協助的事項，歡迎填寫反映。</p></header>
   <section class="panel">
-    <p id="status" class="status" role="status" aria-live="polite">正在連結 LINE 帳號…</p>
+    <p id="status" class="status" role="status" aria-live="polite">正在準備里民意見表…</p>
     <form id="feedbackForm" novalidate>
       <label for="residentName">姓名 <span class="req">*</span></label>
       <input id="residentName" name="residentName" maxlength="60" autocomplete="name" required placeholder="請輸入姓名">
@@ -50,7 +50,7 @@
       <input id="address" name="address" maxlength="200" autocomplete="street-address" placeholder="相關地址（可留空）">
       <label for="opinion">請提出您的意見 <span class="req">*</span></label>
       <textarea id="opinion" name="opinion" maxlength="1600" required placeholder="請描述您的意見、建議或需要通報的事情"></textarea>
-      <p class="tip">送出後，官方 LINE 帳號會回覆受理訊息；填寫內容會存入意見紀錄表。</p>
+      <p class="tip">填好後將開啟原官方 LINE 聊天室，請在 LINE 按「傳送」才會正式受理；官方帳號收到後會回覆並記錄意見。</p>
       <button type="submit" id="submitButton" disabled>送出里民意見</button>
     </form>
     <div class="done" id="done" aria-live="polite">
@@ -85,9 +85,24 @@
     }
     document.body.appendChild(f);f.submit();
   }
+  function openExistingOfficialAccount(text){
+    const oa=String(config.oaLineId||'').trim();
+    if(!/^@[a-zA-Z0-9._-]{3,40}$/.test(oa))throw new Error('尚未設定原官方帳號 LINE ID');
+    // LINE's official oaMessage URL prefills the message, but does NOT send it.
+    const url='https://line.me/R/oaMessage/'+encodeURIComponent(oa)+'/?'+encodeURIComponent(text);
+    setStatus('正在開啟原官方帳號聊天室。請確認文字後，在 LINE 再按一次「傳送」才算完成。');
+    sending=false;submit.disabled=false;
+    window.location.assign(url);
+  }
   async function init(){
-    if(!/^\d+-[a-zA-Z0-9]+$/.test(String(config.liffId||''))){setStatus('尚未設定 LIFF ID，請聯繫管理員。',true);return;}
-    if(!window.liff){setStatus('LINE 元件無法載入，請稍後重試。',true);return;}
+    const hasLiff=/^\d+-[a-zA-Z0-9]+$/.test(String(config.liffId||''));
+    if(!hasLiff || !window.liff){
+      if(/^@[a-zA-Z0-9._-]{3,40}$/.test(String(config.oaLineId||''))){
+        ready=true;submit.disabled=false;
+        setStatus('已準備就緒。填寫後會開啟原 LINE 官方帳號聊天室，請再按一次「傳送」。');
+      }else setStatus('尚未設定官方帳號 LINE ID，請聯繫管理員。',true);
+      return;
+    }
     try{
       await liff.init({liffId:config.liffId,withLoginOnExternalBrowser:true});
       if(!liff.isLoggedIn()){
@@ -97,7 +112,7 @@
       }
       ready=true;submit.disabled=false;
       setStatus(liff.isInClient()?'已連線 LINE，可直接送出意見。':'LINE 已登入，送出後會返回受理頁面。');
-    }catch(err){setStatus('無法連接 LINE：'+(err.message||String(err)),true);}
+    }catch(err){if(/^@[a-zA-Z0-9._-]{3,40}$/.test(String(config.oaLineId||''))){ready=true;submit.disabled=false;setStatus('已改用原官方帳號聊天模式，填寫後須再按「傳送」。');}else{setStatus('無法連接 LINE：'+(err.message||String(err)),true);}}
   }
   form.addEventListener('submit',async function(event){
     event.preventDefault();
@@ -108,19 +123,23 @@
     if(text.length>4900){setStatus('填寫內容過長，請縮短後再送出。',true);return;}
     sending=true;submit.disabled=true;setStatus('正在送出，請勿重複點擊…');
     try{
+      if(!window.liff||!/^\d+-[a-zA-Z0-9]+$/.test(String(config.liffId||''))){
+        openExistingOfficialAccount(text);
+        return;
+      }
       const context=liff.getContext&&liff.getContext();
       if(liff.isInClient()&&context&&context.type==='utou'){
         await liff.sendMessages([{type:'text',text}]);
         form.style.display='none';status.style.display='none';document.getElementById('done').style.display='block';
         const closeButton=document.getElementById('closeButton');closeButton.style.display='block';
       }else{
-        // GitHub Pages 原始連結／外部瀏覽器：跨來源 POST 改採瀏覽器表單導向，避免 CORS 靜默失敗。
-        submitByGAS(v);
+        // LIFF was opened outside the original OA chat: use the official deep link.
+        openExistingOfficialAccount(text);
         return;
       }
     }catch(err){
-      // 若 LIFF 回報送訊失敗，改用 GAS 提交，不自行宣稱 LINE 已送達。
-      try{submitByGAS(v);return;}catch(fallbackError){setStatus('送出失敗：'+(fallbackError.message||err.message||String(err)),true);}
+      // Never report delivery unless LINE confirmed sending. OA chat requires one last tap.
+      try{openExistingOfficialAccount(text);return;}catch(fallbackError){setStatus('送出失敗：'+(fallbackError.message||err.message||String(err)),true);}
     }
     sending=false;submit.disabled=false;
   });
