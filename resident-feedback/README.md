@@ -6,7 +6,15 @@
 - 先前貼入 GAS 的免大橡版 `doPost(e)` 只接受網頁表單，不能接 LINE 的 JSON Webhook。這份 `Code.gs` **同時支援兩種事件**。
 - LINE Webhook 以 `HtmlService.createHtmlOutput('OK')` 回應，避免 `ContentService` 一定會產生的重新導向；仍須用真實 LINE 服務驗證 HTTP 200。
 - 當 Webhook 與表單先後抵達，用同一個 `RF...` 表單編號合併為一列；保留原官方帳號與新 LINE Login 兩種不同的使用者 ID。
-- **GitHub 前端與 Google 試算表已更新；正式 GAS 必須由使用者自行替換、授權並重新部署，並做手機端對端測試。**
+- **GitHub 前端與 Google 試算表已更新；使用者回報已完成 GAS v3 部署，仍須以正式 LINE 收發驗證是否正確生效。**
+
+## 2026-11-16 最新操作原則：不再要求里民手動複製
+
+- **正式入口是原官方 LINE 帳號圖文選單中的 LIFF URL** `https://liff.line.me/2012638796-D0JchPir`。它會載入同一份 GitHub Pages 網頁，但保留 LINE 聊天室的發訊能力。
+- 從原官方 LINE 聊天室開啟後，只需填表並按一次「送出」。前端先呼叫 `liff.sendMessages()` 送出完整意見，再向 GAS 表單端點自動送出相同編號，由 Webhook 收件與回覆。
+- **桌面 Chrome/Edge、一般 GitHub Pages 入口及不具 LINE 聊天室 context 的視窗，現在會停止送出**，不會再顯示「已入庫但請複製去 LINE」的假完成流程，也不會把這種情形寫入新案件。
+- 限制不是權限或驗證步驟可消除：LINE 官方 `liff.sendMessages()` 限於 LINE App 聊天室。若需要電腦首次填表也直接出現在原官方帳號對話，且無任何人工操作，必須另外具備可對應原 Messaging API User ID 的正式身分映射機制；目前不同 Provider 的 LINE Login User ID 不可直接拿來推播。
+- 請將 LIFF 的 `profile`、`chat_message.write` 開啟。若 Channel 仍為 `Developing`，只有 Admin / Tester 能使用；開放里民前須改為 `Published`。
 
 ## 已核對的設定
 
@@ -45,7 +53,7 @@
 - 新 LINE Login Channel 和原 Messaging API Channel 可能屬於不同 Provider，使用者 ID **不相同**。H 欄存原官方帳號 User ID，I 欄存新 LINE Login User ID，不能混用。
 - GAS 的 `doPost(e)` 無法讀到 LINE 原始 `x-line-signature` HTTP header，因此**不能提供 LINE 官方建議的簽章驗證**。目前為了依照你既有 GAS 直連 Webhook 的架構，沒有新增任何代理服務。可自行設定 `WEBHOOK_KEY` 降低偽造風險，但不等價於簽章。
 - LINE 官方 Messaging API Channel 只支援一個 Webhook URL。切換到 GAS 後，原 OakMega Webhook 無法繼續同時接收同一頻道的事件；若其他原先依賴它的功能仍需保留，必須另外評估。
-- `liff.sendMessages()` 只有在 LINE App 中從聊天室開啟、已啟用 `chat_message.write` 且符合官方使用條件時可直接送訊。其他方式會先將資料提交 GAS，再提示里民手動貼到原官方帳號聊天室。
+- `liff.sendMessages()` 只有在 LINE App 中從聊天室開啟、已啟用 `chat_message.write` 且符合官方使用條件時可直接送訊。**其他入口現在禁用送出，不再提供手動複製的替代路徑。**
 - 只有一個真正的 GAS Web App，不需要新官方 LINE、其他伺服器或 GitHub Token。
 - 目前測試是**沙盤模擬與 GitHub 回讀**，不等於已在手機、正式 LINE Webhook 與 GAS 真實回覆完成驗收。
 
