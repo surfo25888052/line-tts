@@ -77,25 +77,15 @@
     if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/.test(url))throw new Error('GAS 網址未設定。');
     const token=liff.getAccessToken&&liff.getAccessToken();
     if(!token)throw new Error('LINE 登入資訊已失效，請由原聊天室重新開啟表單。');
-    const body=new URLSearchParams({
-      form_action:'resident_feedback',
-      access_token:token,
-      name:v.name,
-      phone:v.phone,
-      address:v.address,
-      opinion:v.opinion,
-      submission_id:v.id,
-      line_send_status:'liff_sent'
-    });
-    if(navigator.sendBeacon&&navigator.sendBeacon(url,body)){
-      return Promise.resolve();
+    const payload={form_action:'resident_feedback',access_token:token,
+      name:v.name,phone:v.phone,address:v.address,opinion:v.opinion,
+      submission_id:v.id,line_send_status:'liff_sent'};
+    const f=document.createElement('form');f.method='POST';f.action=url;f.target='_self';f.style.display='none';
+    for(const [key,value] of Object.entries(payload)){
+      const field=document.createElement('input');field.type='hidden';field.name=key;field.value=String(value);f.appendChild(field);
     }
-    return fetch(url,{
-      method:'POST',
-      mode:'no-cors',
-      body:body,
-      keepalive:true
-    }).then(function(){return undefined;});
+    document.body.appendChild(f);
+    f.submit();
   }
   async function init(){
     if(!window.liff){setStatus('無法載入 LINE 元件，請重新開啟表單。',true);return;}
@@ -141,12 +131,8 @@
       return;
     }
     setStatus('');
-    try{
-      submitToGAS(v);
-    }catch(err){
-      console.warn('GAS background submit failed to start:',err&&err.message||String(err));
-    }
-    if(liff.isInClient())liff.closeWindow();
+    try{submitToGAS(v);}
+    catch(err){setStatus('LINE 已送訊，但資料庫提交發生錯誤：'+(err.message||String(err))+'。請勿重複送出 LINE 訊息。',true);sending=false;submit.disabled=false;}
   });
   init();
 })();
