@@ -188,7 +188,7 @@
       return;
     }
 
-    showStatus('LINE 已傳送，正在向系統提交資料…');
+    showStatus('正在向系統提交資料…');
     try {
       await storeInGAS(data, state.caseId, token);
       showStatus('已收到您陳情，待陳情處理完畢後會由承辦人員回覆。');
