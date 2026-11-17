@@ -191,7 +191,7 @@
     showStatus('LINE 已傳送，正在向系統提交資料…');
     try {
       await storeInGAS(data, state.caseId, token);
-      showStatus('LINE 意見已送出，資料庫請求已提交。5 秒後自動關閉表單。');
+      showStatus('已收到您陳情，待陳情處理完畢後會由承辦人員回覆。');
       setTimeout(() => { if (liff.isInClient()) liff.closeWindow(); }, 5000);
     } catch (err) {
       // Never re-enable the button after LINE was sent; repeating would send
