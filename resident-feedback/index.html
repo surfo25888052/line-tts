@@ -25,7 +25,21 @@
     .status[hidden]{display:none}
     button{width:100%;margin-top:24px;background:#175b49;border:none;border-radius:11px;color:white;font-size:1.05rem;font-weight:700;padding:15px;cursor:pointer}
     button:disabled{cursor:not-allowed;opacity:.55}
-    @media(max-width:420px){.panel{padding:18px 15px}.head h1{font-size:1.48rem}}
+    /* Mobile LIFF: safe-area padding, touch targets, no horizontal overflow. */
+    html{max-width:100%;overflow-x:hidden}
+    body{min-height:100dvh;overflow-x:hidden;padding:16px max(12px,env(safe-area-inset-right)) max(26px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+    main{width:100%;min-width:0}
+    input,textarea{min-width:0;max-width:100%}
+    button{min-height:50px;touch-action:manipulation}
+    @media(max-width:420px){
+      .head{padding:8px 2px 12px}
+      .head h1{font-size:1.45rem;margin:5px 0}
+      .panel{padding:16px 14px;border-radius:14px}
+      label{margin:14px 0 7px}
+      textarea{min-height:145px}
+      button{margin-top:18px}
+    }
+    @media(max-width:360px){.panel{padding:14px 12px}.head h1{font-size:1.35rem}}
   </style>
   <script src="./config.js"></script>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -72,7 +86,7 @@
     const context=liff.getContext&&liff.getContext();
     return !!(liff.isInClient()&&context&&context.type==='utou');
   }
-  function submitToGAS(v){
+  async function submitToGAS(v){
     const url=String(config.gasUrl||'');
     if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/.test(url))throw new Error('GAS 網址未設定。');
     const token=liff.getAccessToken&&liff.getAccessToken();
@@ -80,12 +94,9 @@
     const payload={form_action:'resident_feedback',access_token:token,
       name:v.name,phone:v.phone,address:v.address,opinion:v.opinion,
       submission_id:v.id,line_send_status:'liff_sent'};
-    const f=document.createElement('form');f.method='POST';f.action=url;f.target='_self';f.style.display='none';
-    for(const [key,value] of Object.entries(payload)){
-      const field=document.createElement('input');field.type='hidden';field.name=key;field.value=String(value);f.appendChild(field);
-    }
-    document.body.appendChild(f);
-    f.submit();
+    // POST without navigation; Google Apps Script responds across origins.
+    // no-cors hides the HTTP response status, so this only confirms transport completion.
+    await fetch(url,{method:'POST',mode:'no-cors',body:new URLSearchParams(payload)});
   }
   async function init(){
     if(!window.liff){setStatus('無法載入 LINE 元件，請重新開啟表單。',true);return;}
@@ -131,8 +142,14 @@
       return;
     }
     setStatus('');
-    try{submitToGAS(v);}
-    catch(err){setStatus('LINE 已送訊，但資料庫提交發生錯誤：'+(err.message||String(err))+'。請勿重複送出 LINE 訊息。',true);sending=false;submit.disabled=false;}
+    try{
+      await submitToGAS(v);
+      setStatus('意見已傳送，5 秒後自動返回 LINE 聊天室。');
+      setTimeout(function(){if(liff.isInClient())liff.closeWindow();},5000);
+    }catch(err){
+      setStatus('LINE 已送訊，但資料庫請求未完成：'+(err.message||String(err))+'。請勿重複送出 LINE 訊息。',true);
+      sending=false;submit.disabled=false;
+    }
   });
   init();
 })();
