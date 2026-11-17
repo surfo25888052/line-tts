@@ -77,29 +77,25 @@
     if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/.test(url))throw new Error('GAS 網址未設定。');
     const token=liff.getAccessToken&&liff.getAccessToken();
     if(!token)throw new Error('LINE 登入資訊已失效，請由原聊天室重新開啟表單。');
-    const payload={form_action:'resident_feedback',access_token:token,
-      name:v.name,phone:v.phone,address:v.address,opinion:v.opinion,
-      submission_id:v.id,line_send_status:'liff_sent'};
-    return new Promise(function(resolve,reject){
-      const frame=document.createElement('iframe');
-      const frameName='rf_gas_'+Date.now();
-      const f=document.createElement('form');
-      let stage=0;
-      let timer=null;
-      frame.name=frameName;frame.src='about:blank';frame.style.display='none';
-      f.method='POST';f.action=url;f.target=frameName;f.style.display='none';
-      for(const [key,value] of Object.entries(payload)){
-        const field=document.createElement('input');field.type='hidden';field.name=key;field.value=String(value);f.appendChild(field);
-      }
-      function cleanup(){if(timer)clearTimeout(timer);f.remove();frame.remove();}
-      frame.onload=function(){
-        if(stage===0){stage=1;f.submit();return;}
-        if(stage===1){stage=2;cleanup();resolve();}
-      };
-      timer=setTimeout(function(){cleanup();reject(new Error('GAS 回應逾時'));},15000);
-      document.body.appendChild(f);
-      document.body.appendChild(frame);
+    const body=new URLSearchParams({
+      form_action:'resident_feedback',
+      access_token:token,
+      name:v.name,
+      phone:v.phone,
+      address:v.address,
+      opinion:v.opinion,
+      submission_id:v.id,
+      line_send_status:'liff_sent'
     });
+    if(navigator.sendBeacon&&navigator.sendBeacon(url,body)){
+      return Promise.resolve();
+    }
+    return fetch(url,{
+      method:'POST',
+      mode:'no-cors',
+      body:body,
+      keepalive:true
+    }).then(function(){return undefined;});
   }
   async function init(){
     if(!window.liff){setStatus('無法載入 LINE 元件，請重新開啟表單。',true);return;}
