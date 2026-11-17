@@ -142,12 +142,11 @@
     }
     setStatus('');
     try{
-      await submitToGAS(v);
-      if(liff.isInClient())liff.closeWindow();
+      submitToGAS(v);
     }catch(err){
-      setStatus('LINE 已送訊，但資料庫提交發生錯誤：'+(err.message||String(err))+'。請勿重複送出 LINE 訊息。',true);
-      sending=false;submit.disabled=false;
+      console.warn('GAS background submit failed to start:',err&&err.message||String(err));
     }
+    if(liff.isInClient())liff.closeWindow();
   });
   init();
 })();
