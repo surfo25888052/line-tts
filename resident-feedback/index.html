@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
@@ -8,150 +8,199 @@
   <title>里民意見表</title>
   <style>
     :root{font-family:system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1b2b28;background:#f4f8f6;font-synthesis:none}
-    *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;padding:18px 14px 40px}
-    main{max-width:600px;margin:0 auto}
-    .head{padding:22px 10px 16px;text-align:center}
-    .head h1{font-size:1.65rem;margin:6px 0 10px;letter-spacing:.025em}
-    .panel{background:#fff;border:1px solid #dce7df;border-radius:18px;box-shadow:0 6px 28px rgba(17,54,40,.055);padding:22px 20px}
-    label{display:block;font-weight:700;margin:19px 0 8px;font-size:.96rem}
-    label:first-child{margin-top:0}
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{max-width:100%;min-height:100%;margin:0}
+    body{min-height:100dvh;padding:clamp(12px,3vw,24px) max(12px,env(safe-area-inset-right)) max(26px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+    main{width:100%;max-width:600px;margin:0 auto}
+    header{text-align:center;padding:12px 6px 18px}
+    h1{font-size:clamp(1.35rem,4.8vw,1.7rem);margin:0;letter-spacing:.025em}
+    .panel{padding:clamp(15px,4vw,24px);background:#fff;border:1px solid #dce7df;border-radius:16px;box-shadow:0 6px 28px rgba(17,54,40,.055)}
+    label{display:block;margin:17px 0 8px;font-size:.96rem;font-weight:700}
+    label:first-of-type{margin-top:0}
     .req{color:#b72b2b}
-    input,textarea{display:block;width:100%;font:inherit;font-size:16px;color:#1b2b28;background:#fcfefd;border:1px solid #baccc3;border-radius:10px;padding:13px 14px;outline-offset:2px}
+    input,textarea{display:block;width:100%;min-width:0;max-width:100%;padding:13px 14px;font:inherit;font-size:16px;color:#1b2b28;background:#fcfefd;border:1px solid #baccc3;border-radius:10px;outline-offset:2px}
     input:focus,textarea:focus{border-color:#208663;outline:2px solid #d2f0e1}
-    textarea{min-height:175px;resize:vertical;line-height:1.65}
-    .status{border-radius:10px;padding:11px 12px;font-size:.9rem;line-height:1.6;margin:0 0 15px;background:#edf5f0;color:#275941}
+    textarea{min-height:150px;line-height:1.65;resize:vertical}
+    button{display:block;width:100%;min-height:52px;margin-top:22px;padding:13px;background:#175b49;color:white;border:0;border-radius:11px;font:inherit;font-size:1.05rem;font-weight:700;touch-action:manipulation;cursor:pointer}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .status{margin:0 0 16px;padding:11px 12px;border-radius:10px;background:#edf5f0;color:#275941;font-size:.91rem;line-height:1.6;overflow-wrap:anywhere}
     .status.error{background:#fff2f0;color:#a12820}
     .status[hidden]{display:none}
-    button{width:100%;margin-top:24px;background:#175b49;border:none;border-radius:11px;color:white;font-size:1.05rem;font-weight:700;padding:15px;cursor:pointer}
-    button:disabled{cursor:not-allowed;opacity:.55}
-    /* Mobile LIFF: safe-area padding, touch targets, no horizontal overflow. */
-    html{max-width:100%;overflow-x:hidden}
-    body{min-height:100dvh;overflow-x:hidden;padding:16px max(12px,env(safe-area-inset-right)) max(26px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
-    main{width:100%;min-width:0}
-    input,textarea{min-width:0;max-width:100%}
-    button{min-height:50px;touch-action:manipulation}
-    @media(max-width:420px){
-      .head{padding:8px 2px 12px}
-      .head h1{font-size:1.45rem;margin:5px 0}
-      .panel{padding:16px 14px;border-radius:14px}
-      label{margin:14px 0 7px}
-      textarea{min-height:145px}
-      button{margin-top:18px}
-    }
-    @media(max-width:360px){.panel{padding:14px 12px}.head h1{font-size:1.35rem}}
+    @media(max-width:360px){header{padding:8px 0 14px}textarea{min-height:135px}label{margin-top:14px}}
   </style>
   <script src="./config.js"></script>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
 <main>
-  <header class="head"><h1>里民意見表</h1></header>
+  <header><h1>里民意見表</h1></header>
   <section class="panel">
     <p id="status" class="status" role="status" aria-live="polite" hidden></p>
     <form id="feedbackForm">
       <label for="residentName">姓名 <span class="req">*</span></label>
-      <input id="residentName" name="residentName" maxlength="60" autocomplete="name" required placeholder="請輸入姓名">
+      <input id="residentName" name="residentName" autocomplete="name" maxlength="60" required placeholder="請輸入姓名">
       <label for="phone">聯絡電話 <span class="req">*</span></label>
-      <input id="phone" name="phone" type="tel" inputmode="tel" maxlength="40" autocomplete="tel" required placeholder="請輸入聯絡電話">
+      <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="40" required placeholder="請輸入聯絡電話">
       <label for="address">地址 <span class="req">*</span></label>
-      <input id="address" name="address" maxlength="200" autocomplete="street-address" required placeholder="請輸入地址">
+      <input id="address" name="address" autocomplete="street-address" maxlength="200" required placeholder="請輸入地址">
       <label for="opinion">請提出您的意見 <span class="req">*</span></label>
       <textarea id="opinion" name="opinion" maxlength="1600" required placeholder="請輸入您的意見"></textarea>
-      <button type="submit" id="submitButton" disabled>送出里民意見</button>
+      <button id="submitButton" type="submit" disabled>送出里民意見</button>
     </form>
   </section>
 </main>
 <script>
-(function(){
+(() => {
   'use strict';
-  const form=document.getElementById('feedbackForm');
-  const status=document.getElementById('status');
-  const submit=document.getElementById('submitButton');
-  const config=window.RESIDENT_FEEDBACK_CONFIG||{};
-  let ready=false,sending=false,formId=null;
-  submit.disabled=true;
-  function setStatus(message,error){status.textContent=message;status.className=error?'status error':'status';status.hidden=!message;}
-  function cleanOneLine(v){return String(v||'').replace(/[\r\n\u2028\u2029]+/g,' ').trim();}
-  function makeId(){const a=new Uint32Array(2);crypto.getRandomValues(a);return 'RF'+Date.now().toString(36).toUpperCase()+a[0].toString(36).toUpperCase()+a[1].toString(36).toUpperCase();}
-  function getFormData(){
-    if(!formId)formId=makeId();
-    return {id:formId,name:cleanOneLine(document.getElementById('residentName').value),
-      phone:cleanOneLine(document.getElementById('phone').value),address:cleanOneLine(document.getElementById('address').value),
-      opinion:document.getElementById('opinion').value.trim()};
+
+  // The two systems have different data contracts:
+  // LINE chat text contains ONLY visible resident fields.
+  // The internal case identifier is sent ONLY to Google Apps Script.
+  const config = window.RESIDENT_FEEDBACK_CONFIG || {};
+  const form = document.getElementById('feedbackForm');
+  const button = document.getElementById('submitButton');
+  const status = document.getElementById('status');
+  const inputs = {
+    name: document.getElementById('residentName'),
+    phone: document.getElementById('phone'),
+    address: document.getElementById('address'),
+    opinion: document.getElementById('opinion')
+  };
+  const state = {ready:false, busy:false, lineSent:false, caseId:null};
+
+  function showStatus(message, isError = false) {
+    status.textContent = message;
+    status.className = isError ? 'status error' : 'status';
+    status.hidden = !message;
   }
-  function formatMessage(v){return ['【里民意見表】','姓名：'+v.name,'電話：'+v.phone,'地址：'+v.address,
-    '意見內容：',v.opinion].join('\n');}
-  function canSendToCurrentChat(){
-    const context=liff.getContext&&liff.getContext();
-    return !!(liff.isInClient()&&context&&context.type==='utou');
+
+  function singleLine(value) {
+    return String(value || '').replace(/[\r\n\u2028\u2029]+/g, ' ').trim();
   }
-  async function submitToGAS(v){
-    const url=String(config.gasUrl||'');
-    if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/.test(url))throw new Error('GAS 網址未設定。');
-    const token=liff.getAccessToken&&liff.getAccessToken();
-    if(!token)throw new Error('LINE 登入資訊已失效，請由原聊天室重新開啟表單。');
-    const payload={form_action:'resident_feedback',access_token:token,
-      name:v.name,phone:v.phone,address:v.address,opinion:v.opinion,
-      submission_id:v.id,line_send_status:'liff_sent'};
-    // POST without navigation; Google Apps Script responds across origins.
-    // no-cors hides the HTTP response status, so this only confirms transport completion.
-    await fetch(url,{method:'POST',mode:'no-cors',body:new URLSearchParams(payload)});
+
+  function collectOpinion() {
+    return {
+      name: singleLine(inputs.name.value),
+      phone: singleLine(inputs.phone.value),
+      address: singleLine(inputs.address.value),
+      opinion: inputs.opinion.value.replace(/\r\n?/g, '\n').trim()
+    };
   }
-  async function init(){
-    if(!window.liff){setStatus('無法載入 LINE 元件，請重新開啟表單。',true);return;}
-    if(!/^\d+-[A-Za-z0-9]+$/.test(String(config.liffId||''))){setStatus('LIFF ID 尚未設定。',true);return;}
-    try{
-      await liff.init({liffId:config.liffId,withLoginOnExternalBrowser:true});
-      if(!liff.isLoggedIn()){
-        if(!liff.isInClient())liff.login();
-        else throw new Error('LIFF 登入未完成。');
-        return;
+
+  function lineMessage(data) {
+    return [
+      '【里民意見表】',
+      '姓名：' + data.name,
+      '電話：' + data.phone,
+      '地址：' + data.address,
+      '意見內容：',
+      data.opinion
+    ].join('\n');
+  }
+
+  function createCaseId() {
+    const values = new Uint32Array(2);
+    crypto.getRandomValues(values);
+    return 'RF' + Date.now().toString(36).toUpperCase() +
+      values[0].toString(36).toUpperCase() + values[1].toString(36).toUpperCase();
+  }
+
+  function inOriginalChat() {
+    if (!window.liff || !liff.isInClient()) return false;
+    const context = liff.getContext && liff.getContext();
+    return !!(context && context.type === 'utou');
+  }
+
+  async function storeInGAS(data, caseId, token) {
+    const url = String(config.gasUrl || '');
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/.test(url)) {
+      throw new Error('GAS 服務網址設定錯誤。');
+    }
+    const body = new URLSearchParams({
+      form_action: 'resident_feedback',
+      access_token: token,
+      name: data.name,
+      phone: data.phone,
+      address: data.address,
+      opinion: data.opinion,
+      submission_id: caseId,
+      line_send_status: 'liff_sent'
+    });
+    // GAS is cross-origin. no-cors confirms the request transport, NOT the
+    // HTTP success code or the final spreadsheet write.
+    await fetch(url, {method:'POST', mode:'no-cors', body});
+  }
+
+  async function initialize() {
+    button.disabled = true;
+    try {
+      if (!window.liff || !/^\d+-[A-Za-z0-9]+$/.test(String(config.liffId || ''))) {
+        throw new Error('無法載入 LINE 表單服務。');
       }
-      if(!canSendToCurrentChat()){
-        ready=false;submit.disabled=true;
-        setStatus('請從手機 LINE 官方帳號聊天室開啟表單。',true);
-        return;
+      await liff.init({liffId:config.liffId, withLoginOnExternalBrowser:true});
+      if (!liff.isLoggedIn() || !inOriginalChat()) {
+        throw new Error('請從手機 LINE 官方帳號的一對一聊天室開啟此表單。');
       }
-      ready=true;submit.disabled=false;
-      setStatus('');
-    }catch(err){setStatus('無法連線 LINE：'+(err.message||String(err)),true);}
+      state.ready = true;
+      button.disabled = false;
+      showStatus('');
+    } catch (err) {
+      state.ready = false;
+      showStatus(err.message || '無法啟動 LINE 表單，請重新開啟。', true);
+    }
   }
-  form.addEventListener('submit',async function(ev){
-    ev.preventDefault();
-    if(!ready||sending)return;
-    const v=getFormData();
-    if(!v.name||!v.phone||!v.address||!v.opinion){setStatus('姓名、電話、地址及意見內容皆為必填。',true);return;}
-    if(v.opinion.length>1600){setStatus('意見內容不得超過 1600 字。',true);return;}
-    const message=formatMessage(v);
-    if(message.length>4900){setStatus('送至 LINE 的訊息過長。',true);return;}
-    if(!canSendToCurrentChat()){
-      setStatus('目前不是 LINE 聊天室模式，無法自動傳送，資料未提交。請從原官方帳號的 LINE 聊天室重新開啟。',true);
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!state.ready || state.busy || state.lineSent) return;
+    if (!form.reportValidity()) return;
+    const data = collectOpinion();
+    if (!data.name || !data.phone || !data.address || !data.opinion) {
+      showStatus('姓名、電話、地址與意見內容均為必填。', true);
       return;
     }
-    if(!(liff.getAccessToken&&liff.getAccessToken())){setStatus('LINE 登入資訊失效，請重新開啟表單，尚未送訊。',true);return;}
-    sending=true;submit.disabled=true;
-    setStatus('正在由您的 LINE 帳號自動送出意見…');
-    try{
-      await liff.sendMessages([{type:'text',text:message}]);
-    }catch(err){
-      // Never turn a failed or ambiguous LINE send into an incomplete GAS-only receipt.
-      console.warn('LIFF sendMessages not confirmed: ',err&&err.code||'unknown');
-      setStatus('LINE 尚未確認訊息送達，未從本頁提交資料庫。請確認原聊天紀錄是否已出現訊息，再決定是否重新送出。',true);
-      sending=false;submit.disabled=false;
+    const message = lineMessage(data);
+    if (message.length > 4900) {
+      showStatus('內容過長，無法傳送至 LINE。', true);
       return;
     }
-    setStatus('');
-    try{
-      await submitToGAS(v);
-      setStatus('意見已傳送，5 秒後自動返回 LINE 聊天室。');
-      setTimeout(function(){if(liff.isInClient())liff.closeWindow();},5000);
-    }catch(err){
-      setStatus('LINE 已送訊，但資料庫請求未完成：'+(err.message||String(err))+'。請勿重複送出 LINE 訊息。',true);
-      sending=false;submit.disabled=false;
+    if (!inOriginalChat()) {
+      showStatus('目前未位於官方帳號聊天室，尚未送出。', true);
+      return;
+    }
+    const token = liff.getAccessToken && liff.getAccessToken();
+    if (!token) {
+      showStatus('LINE 登入資訊已失效，請重新從聊天室開啟表單。', true);
+      return;
+    }
+
+    state.caseId ||= createCaseId();
+    state.busy = true;
+    button.disabled = true;
+    showStatus('正在透過您的 LINE 帳號傳送意見…');
+    try {
+      await liff.sendMessages([{type:'text', text:message}]);
+      state.lineSent = true;
+    } catch (err) {
+      state.busy = false;
+      button.disabled = false;
+      showStatus('LINE 尚未確認傳送成功；請先檢查聊天室是否已出現這筆意見，避免重複送件。', true);
+      return;
+    }
+
+    showStatus('LINE 已傳送，正在向系統提交資料…');
+    try {
+      await storeInGAS(data, state.caseId, token);
+      showStatus('LINE 意見已送出，資料庫請求已提交。5 秒後自動關閉表單。');
+      setTimeout(() => { if (liff.isInClient()) liff.closeWindow(); }, 5000);
+    } catch (err) {
+      // Never re-enable the button after LINE was sent; repeating would send
+      // a second visible LINE message even when the first GAS POST succeeded.
+      showStatus('LINE 意見已送出，但資料庫請求未完成。請勿重複按送出；請聯繫承辦人員確認。', true);
     }
   });
-  init();
+
+  initialize();
 })();
 </script>
 </body>
