@@ -67,7 +67,7 @@
       opinion:document.getElementById('opinion').value.trim()};
   }
   function formatMessage(v){return ['【里民意見表】','姓名：'+v.name,'電話：'+v.phone,'地址：'+v.address,
-    '意見內容：',v.opinion].join('\n');}
+    '意見內容：',v.opinion,'表單編號：'+v.id].join('\n');}
   function canSendToCurrentChat(){
     const context=liff.getContext&&liff.getContext();
     return !!(liff.isInClient()&&context&&context.type==='utou');
